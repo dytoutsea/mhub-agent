@@ -1,0 +1,33 @@
+{
+  "name": "mhub-agent-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MHub Expo and Electron client workspace",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "modules/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace @mhub/shared && npm run build --workspace @mhub/mobile && npm run build --workspace @mhub/desktop",
+    "check": "biome check .",
+    "check:write": "biome check --write .",
+    "dev:mobile": "npm run start --workspace @mhub/mobile",
+    "dev:web": "npm run web --workspace @mhub/mobile",
+    "dev:desktop": "npm run dev --workspace @mhub/desktop",
+    "expo:check": "npm exec --workspace @mhub/mobile -- expo install --check",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "verify": "npm run check && npm run typecheck && npm run test && npm run expo:check && npm run build"
+  },
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11 <12"
+  },
+  "packageManager": "npm@11.12.1",
+  "devDependencies": {
+    "@biomejs/biome": "2.5.7",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}

@@ -1,0 +1,38 @@
+# Dependencies and package-manager state
+node_modules/
+.npm/
+
+# Build and test output
+dist/
+build/
+release/
+coverage/
+*.tsbuildinfo
+
+# Expo generated state
+.expo/
+.expo-shared/
+apps/mobile/android/
+apps/mobile/ios/
+web-build/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision
+*.provisionprofile
+*.keystore
+*.jks
+
+# IDEs, operating systems and local agents
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+.agent-work/
+*.log

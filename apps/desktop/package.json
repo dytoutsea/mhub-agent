@@ -1,0 +1,55 @@
+{
+  "name": "@mhub/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsup src/main.ts src/preload.ts --format cjs --platform node --out-dir dist --clean",
+    "dev": "npm run build && cross-env MHUB_RENDERER_URL=http://localhost:8081 electron .",
+    "package": "npm run build && electron-builder",
+    "start": "electron .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "cross-env": "10.1.0",
+    "electron": "43.3.0",
+    "electron-builder": "26.15.3",
+    "tsup": "8.5.1"
+  },
+  "build": {
+    "appId": "com.mhub.agent",
+    "productName": "MHub Agent",
+    "asar": true,
+    "artifactName": "mhub-agent-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../mobile/dist",
+        "to": "renderer"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "hardenedRuntime": true,
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@mhub/sdk-poc",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start:echo": "npm run build && node dist/cli.js echo",
+    "start:probe": "npm run build && node dist/cli.js probe",
+    "start:socks": "npm run build && node dist/cli.js socks",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ipaddr.js": "2.5.0"
+  }
+}

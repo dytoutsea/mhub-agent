@@ -19,6 +19,8 @@ apps/
 packages/
   shared/      平台无关状态类型
 modules/       后续 Expo Native Module 边界
+tools/
+  sdk-poc/     SDK SOCKS5、DNS、端口和断线行为验证工具
 ```
 
 ## 本地开发
@@ -44,6 +46,8 @@ npm run dev:desktop
 ```
 
 完整验证包含 Biome、严格类型检查、单元测试、Expo 依赖兼容检查、Web 导出和 Electron 编译。
+
+SDK 前置门禁工具和执行限制见 [`tools/sdk-poc/README.md`](./tools/sdk-poc/README.md)。PoC 默认只绑定回环地址、强制 SOCKS5 用户名密码并阻断非公网目标；真实 SDK 有副作用调用不包含在自动化脚本中。
 
 ## 安全约束
 

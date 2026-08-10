@@ -6,16 +6,22 @@
   "workspaces": [
     "apps/*",
     "packages/*",
-    "modules/*"
+    "modules/*",
+    "tools/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace @mhub/shared && npm run build --workspace @mhub/mobile && npm run build --workspace @mhub/desktop",
+    "build": "npm run build --workspace @mhub/shared && npm run build --workspace @mhub/sdk-poc && npm run build --workspace @mhub/mobile && npm run build --workspace @mhub/desktop",
     "check": "biome check .",
     "check:write": "biome check --write .",
     "dev:mobile": "npm run start --workspace @mhub/mobile",
     "dev:web": "npm run web --workspace @mhub/mobile",
     "dev:desktop": "npm run dev --workspace @mhub/desktop",
     "expo:check": "npm exec --workspace @mhub/mobile -- expo install --check",
+    "poc:certificate": "sh tools/sdk-poc/scripts/generate-certificate.sh",
+    "poc:echo": "npm run start:echo --workspace @mhub/sdk-poc",
+    "poc:probe": "npm run start:probe --workspace @mhub/sdk-poc",
+    "poc:smoke": "sh tools/sdk-poc/scripts/run-local-smoke.sh",
+    "poc:socks": "npm run start:socks --workspace @mhub/sdk-poc",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "verify": "npm run check && npm run typecheck && npm run test && npm run expo:check && npm run build"

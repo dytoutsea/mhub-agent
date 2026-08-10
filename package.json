@@ -10,7 +10,7 @@
     "tools/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace @mhub/shared && npm run build --workspace @mhub/sdk-poc && npm run build --workspace @mhub/mobile && npm run build --workspace @mhub/desktop",
+    "build": "npm run build --workspace @mhub/shared && npm run build --workspace @mhub/sdk-poc && npm run build --workspace @mhub/relay-agent && npm run build --workspace @mhub/mobile && npm run build --workspace @mhub/desktop",
     "check": "biome check .",
     "check:write": "biome check --write .",
     "dev:mobile": "npm run start --workspace @mhub/mobile",
@@ -22,6 +22,8 @@
     "poc:probe": "npm run start:probe --workspace @mhub/sdk-poc",
     "poc:smoke": "sh tools/sdk-poc/scripts/run-local-smoke.sh",
     "poc:socks": "npm run start:socks --workspace @mhub/sdk-poc",
+    "relay-agent": "npm run start --workspace @mhub/relay-agent",
+    "test:relay-e2e": "sh tools/relay-agent/scripts/run-local-e2e.sh",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "verify": "npm run check && npm run typecheck && npm run test && npm run expo:check && npm run build"

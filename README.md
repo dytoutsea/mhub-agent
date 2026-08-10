@@ -32,6 +32,26 @@ npm ci
 npm run verify
 ```
 
+### M1 Node Agent
+
+`tools/relay-agent` 是 M1 数据链路 CLI，也是后续 Electron Main Process 复用的运行时核心。它连接 Relay control WebSocket，收到 `OPEN_REQUEST` 后校验目标 IP、建立目标 TCP 和每流 data WebSocket，并在 Node 运行时内执行二进制转发和背压。
+
+```bash
+cp .env.example .env
+# 在 shell 或本地 secret runner 中加载配置后：
+npm run relay-agent
+```
+
+默认只允许公网 IP，拒绝域名、回环和私网地址。`MHUB_AGENT_ALLOW_PRIVATE_TARGETS=true` 只用于隔离的本机 E2E。
+
+构建 `mhub-relay` 后可执行跨仓库本机链路测试：
+
+```bash
+MHUB_RELAY_JAR=/absolute/path/to/mhub-relay.jar npm run test:relay-e2e
+```
+
+测试使用临时自签证书覆盖 WSS、成功的 IPv4 出口、错误 SOCKS5 凭证和 domain address 拒绝；临时进程、日志、证书和测试凭证在退出时删除。
+
 启动移动端/浏览器界面：
 
 ```bash

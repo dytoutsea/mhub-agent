@@ -1,5 +1,5 @@
 import path from "node:path";
-import { app, BrowserWindow, ipcMain, session, shell } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, session, shell, Tray } from "electron";
 
 import { ActivationManager } from "./activation-manager";
 import { DesktopAgentRuntime } from "./agent-runtime";
@@ -16,6 +16,8 @@ import { SafeStorageSecretStore } from "./secure-store";
 let mainWindow: BrowserWindow | null = null;
 let agentRuntime: DesktopAgentRuntime | null = null;
 let activationManager: ActivationManager | null = null;
+let tray: Tray | null = null;
+let quitting = false;
 
 function hostPlatform(): "windows" | "macos" | "unsupported" {
   if (process.platform === "win32") {
@@ -64,9 +66,68 @@ function registerIpcHandlers() {
 
 function broadcastAgentState(snapshot: ReturnType<DesktopAgentRuntime["getSnapshot"]>) {
   const event = agentEventSchema.parse({ snapshot });
+  updateTrayMenu();
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(desktopChannels.agentStateChanged, event);
   }
+}
+
+function updateTrayMenu() {
+  if (!tray || !agentRuntime) {
+    return;
+  }
+  const snapshot = agentRuntime.getSnapshot();
+  const canStart = snapshot.state === "stopped" || snapshot.state === "degraded";
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: "显示 MHub Agent",
+        click: () => showMainWindow(),
+      },
+      { type: "separator" },
+      {
+        label: snapshot.state === "online" ? "代理在线" : `代理状态：${snapshot.state}`,
+        enabled: false,
+      },
+      {
+        label: "启动代理",
+        enabled: canStart,
+        click: () => void agentRuntime?.start().catch(() => undefined),
+      },
+      {
+        label: "停止代理",
+        enabled: snapshot.state === "online" || snapshot.state === "connecting",
+        click: () => void agentRuntime?.stop(),
+      },
+      { type: "separator" },
+      {
+        label: "退出",
+        click: () => app.quit(),
+      },
+    ]),
+  );
+}
+
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    void createMainWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function createTray() {
+  if (tray) {
+    return;
+  }
+  tray = new Tray(nativeImage.createEmpty());
+  tray.setToolTip("MHub Agent");
+  tray.on("click", showMainWindow);
+  updateTrayMenu();
 }
 
 function enforceProductionContentSecurityPolicy() {
@@ -121,6 +182,12 @@ async function createMainWindow() {
   });
 
   window.once("ready-to-show", () => window.show());
+  window.on("close", (event) => {
+    if (!quitting) {
+      event.preventDefault();
+      window.hide();
+    }
+  });
   window.on("closed", () => {
     if (mainWindow === window) {
       mainWindow = null;
@@ -179,6 +246,7 @@ if (!ownsSingleInstanceLock) {
     agentRuntime.subscribe(broadcastAgentState);
     registerIpcHandlers();
     enforceProductionContentSecurityPolicy();
+    createTray();
     await createMainWindow();
 
     app.on("activate", () => {
@@ -189,12 +257,13 @@ if (!ownsSingleInstanceLock) {
   });
 
   app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") {
-      app.quit();
-    }
+    // The tray owns the desktop lifecycle; closing the window must not stop the agent.
   });
 
   app.on("before-quit", () => {
+    quitting = true;
     void agentRuntime?.stop();
+    tray?.destroy();
+    tray = null;
   });
 }

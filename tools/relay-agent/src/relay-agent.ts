@@ -4,6 +4,7 @@ import WebSocket, { type RawData } from "ws";
 
 import { isAllowedTargetIp, sameIp } from "./address-policy.js";
 import { hello, type OpenRequest, parseDataAccepted, parseRelayMessage } from "./protocol.js";
+import type { SessionTicketClient } from "./session-ticket-client.js";
 
 const HIGH_WATER_MARK = 256 * 1024;
 const LOW_WATER_MARK = 64 * 1024;
@@ -12,7 +13,8 @@ const HARD_BUFFER_LIMIT = 1024 * 1024;
 export interface RelayAgentOptions {
   readonly controlUrl: string;
   readonly proxyId: string;
-  readonly ticket: string;
+  readonly ticket?: string | undefined;
+  readonly sessionTicketClient?: SessionTicketClient | undefined;
   readonly allowPrivateTargets?: boolean;
   readonly onEvent?: (event: RelayAgentEvent) => void;
 }
@@ -26,19 +28,41 @@ export class RelayAgent {
   private control: WebSocket | null = null;
   private readonly streams = new Map<string, AgentStream>();
   private stopping = false;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private reconnectAttempt = 0;
 
   constructor(private readonly options: RelayAgentOptions) {
     validateOptions(options);
   }
 
   async start(): Promise<void> {
-    if (this.control) {
+    if (this.control || this.reconnectTimer) {
       throw new Error("AGENT_ALREADY_STARTED");
+    }
+    this.stopping = false;
+    await this.connectControl();
+  }
+
+  private async connectControl(): Promise<void> {
+    if (this.stopping) {
+      return;
     }
     const control = new WebSocket(this.options.controlUrl, { maxPayload: 64 * 1024 });
     this.control = control;
-    await waitForOpen(control, 10_000);
-    control.send(JSON.stringify(hello(this.options.proxyId, this.options.ticket)));
+    try {
+      await waitForOpen(control, 10_000);
+      const ticket = this.options.sessionTicketClient
+        ? (await this.options.sessionTicketClient.issue()).ticket
+        : this.options.ticket;
+      if (!ticket) {
+        throw new Error("AGENT_CREDENTIALS_REQUIRED");
+      }
+      control.send(JSON.stringify(hello(this.options.proxyId, ticket)));
+    } catch (error) {
+      this.control = null;
+      control.terminate();
+      throw error;
+    }
     control.on("message", (data, isBinary) => {
       if (isBinary) {
         this.failControl("BINARY_CONTROL_MESSAGE");
@@ -46,8 +70,37 @@ export class RelayAgent {
       }
       this.handleControl(data.toString());
     });
-    control.on("close", () => this.stopStreams());
-    control.on("error", () => this.stopStreams());
+    control.on("close", () => this.handleDisconnect(control));
+    control.on("error", () => this.handleDisconnect(control));
+    this.reconnectAttempt = 0;
+  }
+
+  private handleDisconnect(control: WebSocket) {
+    if (this.control !== control) {
+      return;
+    }
+    this.control = null;
+    this.stopStreams();
+    if (this.stopping || !this.options.sessionTicketClient || this.reconnectTimer) {
+      return;
+    }
+    const delays = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000];
+    const delay = delays[Math.min(this.reconnectAttempt, delays.length - 1)];
+    this.reconnectAttempt += 1;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      void this.connectControl().catch(() => this.handleReconnectFailure());
+    }, delay);
+  }
+
+  private handleReconnectFailure() {
+    if (this.stopping || this.reconnectTimer) {
+      return;
+    }
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      void this.connectControl().catch(() => this.handleReconnectFailure());
+    }, 1_000);
   }
 
   async stop(): Promise<void> {
@@ -55,6 +108,10 @@ export class RelayAgent {
       return;
     }
     this.stopping = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.stopStreams();
     const control = this.control;
     this.control = null;
@@ -377,7 +434,7 @@ function validateOptions(options: RelayAgentOptions) {
   ) {
     throw new Error("CONTROL_URL_INVALID");
   }
-  if (!options.proxyId.trim() || !options.ticket) {
+  if (!options.proxyId.trim() || (!options.ticket && !options.sessionTicketClient)) {
     throw new Error("AGENT_CREDENTIALS_REQUIRED");
   }
 }

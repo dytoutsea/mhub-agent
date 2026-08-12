@@ -1,9 +1,21 @@
 import { RelayAgent } from "./relay-agent.js";
+import { SessionTicketClient } from "./session-ticket-client.js";
 
+const apiUrl = process.env.MHUB_AGENT_API_URL;
+const credentialId = process.env.MHUB_AGENT_CREDENTIAL_ID;
+const devicePrivateKey = process.env.MHUB_AGENT_DEVICE_PRIVATE_KEY;
 const agent = new RelayAgent({
   controlUrl: requiredEnvironment("MHUB_AGENT_RELAY_CONTROL_URL"),
   proxyId: requiredEnvironment("MHUB_AGENT_PROXY_ID"),
-  ticket: requiredEnvironment("MHUB_AGENT_SESSION_TICKET"),
+  ticket: process.env.MHUB_AGENT_SESSION_TICKET,
+  sessionTicketClient:
+    apiUrl && credentialId && devicePrivateKey
+      ? new SessionTicketClient({
+          apiUrl,
+          credentialId,
+          devicePrivateKey,
+        })
+      : undefined,
   allowPrivateTargets: process.env.MHUB_AGENT_ALLOW_PRIVATE_TARGETS === "true",
   onEvent: (event) => process.stdout.write(`${JSON.stringify(event)}\n`),
 });

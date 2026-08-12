@@ -36,6 +36,8 @@ npm run verify
 
 `tools/relay-agent` 是 M1 数据链路 CLI，也是后续 Electron Main Process 复用的运行时核心。它连接 Relay control WebSocket，收到 `OPEN_REQUEST` 后校验目标 IP、建立目标 TCP 和每流 data WebSocket，并在 Node 运行时内执行二进制转发和背压。
 
+Node Agent 默认通过设备签名向 `mhub-server` 获取短期 relay session ticket。配置 `MHUB_AGENT_API_URL`、`MHUB_AGENT_CREDENTIAL_ID` 和 `MHUB_AGENT_DEVICE_PRIVATE_KEY`（PKCS#8 Ed25519 私钥的 Base64URL）后，启动时会调用 `POST /agent-api/v1/session-tickets`，请求使用 `X-Credential-Id`、`X-Timestamp`、`X-Nonce` 和 `X-Signature` 认证。`MHUB_AGENT_SESSION_TICKET` 仅保留给隔离的协议测试，不应作为生产配置。
+
 ```bash
 cp .env.example .env
 # 在 shell 或本地 secret runner 中加载配置后：

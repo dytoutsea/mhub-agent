@@ -69,6 +69,12 @@ npm run dev:desktop
 
 完整验证包含 Biome、严格类型检查、单元测试、Expo 依赖兼容检查、Web 导出和 Electron 编译。
 
+### Electron Agent Runtime 开发配置
+
+Electron Main Process 持有 Relay Agent 生命周期，Renderer 只通过版本化 IPC 获取快照、启动/停止和接收脱敏状态事件。激活流程与操作系统安全存储留在下一切片。
+
+隔离本地协议测试可通过被忽略的进程环境变量注入配置：`MHUB_RELAY_CONTROL_URL`、`MHUB_PROXY_ID`，以及静态测试 ticket `MHUB_RELAY_TICKET`，或动态 ticket 组合 `MHUB_AGENT_API_URL`、`MHUB_CREDENTIAL_ID`、`MHUB_DEVICE_PRIVATE_KEY`。这些值不会展示或写入日志。
+
 SDK 前置门禁工具和执行限制见 [`tools/sdk-poc/README.md`](./tools/sdk-poc/README.md)。PoC 默认只绑定回环地址、强制 SOCKS5 用户名密码并阻断非公网目标；真实 SDK 有副作用调用不包含在自动化脚本中。
 
 ## 安全约束

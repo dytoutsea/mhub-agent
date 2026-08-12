@@ -8,6 +8,7 @@
     "dev": "npm run build && cross-env MHUB_RENDERER_URL=http://localhost:8081 electron .",
     "package": "npm run build && electron-builder",
     "start": "electron .",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

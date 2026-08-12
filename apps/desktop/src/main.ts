@@ -1,9 +1,16 @@
 import path from "node:path";
 import { app, BrowserWindow, ipcMain, session, shell } from "electron";
 
-import { desktopChannels, hostInfoSchema } from "./contracts";
+import { DesktopAgentRuntime } from "./agent-runtime";
+import {
+  agentEventSchema,
+  agentSnapshotSchema,
+  desktopChannels,
+  hostInfoSchema,
+} from "./contracts";
 
 let mainWindow: BrowserWindow | null = null;
+let agentRuntime: DesktopAgentRuntime | null = null;
 
 function hostPlatform(): "windows" | "macos" | "unsupported" {
   if (process.platform === "win32") {
@@ -22,6 +29,28 @@ function registerIpcHandlers() {
       platform: hostPlatform(),
     }),
   );
+  ipcMain.handle(desktopChannels.agentGetState, () =>
+    agentSnapshotSchema.parse(agentRuntime?.getSnapshot()),
+  );
+  ipcMain.handle(desktopChannels.agentStart, async () => {
+    if (!agentRuntime) {
+      throw new Error("AGENT_RUNTIME_UNAVAILABLE");
+    }
+    return agentSnapshotSchema.parse(await agentRuntime.start());
+  });
+  ipcMain.handle(desktopChannels.agentStop, async () => {
+    if (!agentRuntime) {
+      throw new Error("AGENT_RUNTIME_UNAVAILABLE");
+    }
+    return agentSnapshotSchema.parse(await agentRuntime.stop());
+  });
+}
+
+function broadcastAgentState(snapshot: ReturnType<DesktopAgentRuntime["getSnapshot"]>) {
+  const event = agentEventSchema.parse({ snapshot });
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(desktopChannels.agentStateChanged, event);
+  }
 }
 
 function enforceProductionContentSecurityPolicy() {
@@ -110,6 +139,8 @@ if (!ownsSingleInstanceLock) {
   });
 
   app.whenReady().then(async () => {
+    agentRuntime = new DesktopAgentRuntime(hostPlatform());
+    agentRuntime.subscribe(broadcastAgentState);
     registerIpcHandlers();
     enforceProductionContentSecurityPolicy();
     await createMainWindow();
@@ -125,5 +156,9 @@ if (!ownsSingleInstanceLock) {
     if (process.platform !== "darwin") {
       app.quit();
     }
+  });
+
+  app.on("before-quit", () => {
+    void agentRuntime?.stop();
   });
 }

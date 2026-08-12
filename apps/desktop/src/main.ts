@@ -1,16 +1,21 @@
 import path from "node:path";
 import { app, BrowserWindow, ipcMain, session, shell } from "electron";
 
+import { ActivationManager } from "./activation-manager";
 import { DesktopAgentRuntime } from "./agent-runtime";
 import {
+  activationRequestSchema,
+  activationResultSchema,
   agentEventSchema,
   agentSnapshotSchema,
   desktopChannels,
   hostInfoSchema,
 } from "./contracts";
+import { SafeStorageSecretStore } from "./secure-store";
 
 let mainWindow: BrowserWindow | null = null;
 let agentRuntime: DesktopAgentRuntime | null = null;
+let activationManager: ActivationManager | null = null;
 
 function hostPlatform(): "windows" | "macos" | "unsupported" {
   if (process.platform === "win32") {
@@ -43,6 +48,17 @@ function registerIpcHandlers() {
       throw new Error("AGENT_RUNTIME_UNAVAILABLE");
     }
     return agentSnapshotSchema.parse(await agentRuntime.stop());
+  });
+  ipcMain.handle(desktopChannels.agentActivate, async (_event, payload: unknown) => {
+    if (!activationManager) {
+      throw new Error("ACTIVATION_CONFIGURATION_REQUIRED");
+    }
+    const request = activationRequestSchema.parse(payload);
+    const activated = await activationManager.activate(request.activationCode);
+    await agentRuntime?.stop();
+    agentRuntime = new DesktopAgentRuntime(hostPlatform(), activated.config);
+    agentRuntime.subscribe(broadcastAgentState);
+    return activationResultSchema.parse(activated.result);
   });
 }
 
@@ -139,7 +155,27 @@ if (!ownsSingleInstanceLock) {
   });
 
   app.whenReady().then(async () => {
-    agentRuntime = new DesktopAgentRuntime(hostPlatform());
+    const controlUrl = process.env.MHUB_RELAY_CONTROL_URL?.trim();
+    const activationApiUrl = process.env.MHUB_AGENT_ACTIVATION_API_URL?.trim();
+    const platform = hostPlatform();
+    if (controlUrl && activationApiUrl && platform !== "unsupported") {
+      activationManager = new ActivationManager({
+        apiUrl: activationApiUrl,
+        controlUrl,
+        platform,
+        store: new SafeStorageSecretStore(
+          path.join(app.getPath("userData"), "agent-credentials.enc"),
+        ),
+      });
+      try {
+        const config = await activationManager.loadRuntimeConfig();
+        agentRuntime = new DesktopAgentRuntime(hostPlatform(), config);
+      } catch {
+        agentRuntime = new DesktopAgentRuntime(hostPlatform(), null);
+      }
+    } else {
+      agentRuntime = new DesktopAgentRuntime(hostPlatform());
+    }
     agentRuntime.subscribe(broadcastAgentState);
     registerIpcHandlers();
     enforceProductionContentSecurityPolicy();

@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from "electron";
 
 import {
+  activationRequestSchema,
+  activationResultSchema,
   agentEventSchema,
   agentSnapshotSchema,
   desktopChannels,
@@ -11,6 +13,13 @@ const desktopApi = Object.freeze({
   getHostInfo: async () =>
     hostInfoSchema.parse(await ipcRenderer.invoke(desktopChannels.getHostInfo)),
   agent: Object.freeze({
+    activate: async (payload: unknown) =>
+      activationResultSchema.parse(
+        await ipcRenderer.invoke(
+          desktopChannels.agentActivate,
+          activationRequestSchema.parse(payload),
+        ),
+      ),
     getState: async () =>
       agentSnapshotSchema.parse(await ipcRenderer.invoke(desktopChannels.agentGetState)),
     start: async () =>

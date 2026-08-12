@@ -71,7 +71,9 @@ npm run dev:desktop
 
 ### Electron Agent Runtime 开发配置
 
-Electron Main Process 持有 Relay Agent 生命周期，Renderer 只通过版本化 IPC 获取快照、启动/停止和接收脱敏状态事件。激活流程与操作系统安全存储留在下一切片。
+Electron Main Process 持有 Relay Agent 生命周期，Renderer 只通过版本化 IPC 获取快照、启动/停止和接收脱敏状态事件。桌面激活和安全存储已在当前切片接入，后续再补托盘交互和正式配置分发。
+
+当前桌面激活入口为 `agent.activate({ activationCode })`。Main 使用 Electron `safeStorage` 保存设备私钥和一次性 refresh credential 的加密配置；需要设置 `MHUB_AGENT_ACTIVATION_API_URL` 与 `MHUB_RELAY_CONTROL_URL` 才会启用该入口。
 
 隔离本地协议测试可通过被忽略的进程环境变量注入配置：`MHUB_RELAY_CONTROL_URL`、`MHUB_PROXY_ID`，以及静态测试 ticket `MHUB_RELAY_TICKET`，或动态 ticket 组合 `MHUB_AGENT_API_URL`、`MHUB_CREDENTIAL_ID`、`MHUB_DEVICE_PRIVATE_KEY`。这些值不会展示或写入日志。
 

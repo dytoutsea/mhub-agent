@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["MHubMobileDataTunnelModule"]
+  },
+  "android": {
+    "modules": ["com.mhub.agent.tunnel.MHubMobileDataTunnelModule"]
+  }
+}

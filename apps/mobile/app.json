@@ -4,13 +4,20 @@
     "slug": "mhub-agent",
     "version": "0.1.0",
     "orientation": "portrait",
+    "plugins": ["@mhub/mobile-data-tunnel"],
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.mhub.agent",
       "supportsTablet": true
     },
     "android": {
-      "package": "com.mhub.agent"
+      "package": "com.mhub.agent",
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.VIBRATE"
+      ]
     },
     "web": {
       "bundler": "metro",

@@ -4,15 +4,16 @@
   "private": true,
   "main": "index.ts",
   "scripts": {
-    "android": "expo start --android",
+    "android": "expo run:android",
     "build": "expo export --platform web --output-dir dist",
-    "ios": "expo start --ios",
+    "ios": "expo run:ios",
     "start": "expo start",
     "typecheck": "tsc --noEmit",
     "web": "expo start --web"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.8",
+    "@mhub/mobile-data-tunnel": "*",
     "@mhub/shared": "*",
     "expo": "~57.0.11",
     "expo-status-bar": "~57.0.1",

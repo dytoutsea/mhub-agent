@@ -17,6 +17,7 @@
     "dev:web": "npm run web --workspace @mhub/mobile",
     "dev:desktop": "npm run dev --workspace @mhub/desktop",
     "expo:check": "npm exec --workspace @mhub/mobile -- expo install --check",
+    "mobile:native:check": "npm exec --workspace @mhub/mobile -- expo prebuild --clean --no-install && node scripts/check-mobile-native-boundary.mjs",
     "poc:certificate": "sh tools/sdk-poc/scripts/generate-certificate.sh",
     "poc:echo": "npm run start:echo --workspace @mhub/sdk-poc",
     "poc:probe": "npm run start:probe --workspace @mhub/sdk-poc",
@@ -26,7 +27,7 @@
     "test:relay-e2e": "sh tools/relay-agent/scripts/run-local-e2e.sh",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "verify": "npm run check && npm run typecheck && npm run test && npm run expo:check && npm run build"
+    "verify": "npm run check && npm run typecheck && npm run test && npm run mobile:native:check && npm run expo:check && npm run build"
   },
   "engines": {
     "node": ">=24 <25",

@@ -1,0 +1,15 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.mhub.agent'
+version = '0.1.0'
+
+android {
+  namespace "com.mhub.agent.tunnel"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+}

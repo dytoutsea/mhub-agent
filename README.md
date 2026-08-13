@@ -1,14 +1,14 @@
 # MHub Agent
 
-MHub Windows、macOS、Android 和 iOS 客户端的独立 monorepo。桌面端使用 Electron，移动端和共享界面使用 Expo；项目当前处于工程骨架阶段，尚未实现激活、控制 WSS 或代理数据转发。
+MHub Windows、macOS、Android 和 iOS 客户端的独立 monorepo。桌面端使用 Electron，移动端和共享界面使用 Expo。当前已实现 Node/Electron 控制链路、Android 前台数据通道，以及 Android/iOS 共用的移动激活、设备签名和控制 WSS 编排；iOS 原生数据通道仍在开发。
 
 ## 当前边界
 
-- Windows/macOS：Electron Main Process 将承载 AgentRuntime，Renderer 使用 Expo Web 导出。
+- Windows/macOS：Electron Main Process 持有 AgentRuntime，Renderer 使用 Expo Web 导出。
 - Android/iOS：第一期只在 App 前台运行，进入后台或锁屏时必须下线。
-- 移动数据通道后续由 Kotlin/Swift 原生模块完成，业务字节不得经过 React Native JS Bridge。
-- Relay 协议 v1 Schema 的权威仓库尚未决议，本仓库当前不定义该契约。
-- 不包含 Android Foreground Service、iOS Network Extension、后台保活或真实代理逻辑。
+- Android 数据通道由 Kotlin 原生模块实现；iOS Swift 实现尚未完成。业务字节不得经过 React Native JS Bridge。
+- Relay 协议 v1 Schema 由 `mhub-relay` 持有，本仓库维护严格消费者实现和兼容测试。
+- 不包含 Android Foreground Service、iOS Network Extension 或后台保活。
 
 ## 目录
 
@@ -18,7 +18,9 @@ apps/
   desktop/     Electron Main、Preload 与打包配置
 packages/
   shared/      平台无关状态类型
-modules/       后续 Expo Native Module 边界
+  relay-protocol/ Relay v1 严格消费者
+  mobile-runtime/ 移动控制通道与设备身份协议
+modules/       Expo 原生数据通道边界
 tools/
   sdk-poc/     SDK SOCKS5、DNS、端口和断线行为验证工具
 ```
@@ -59,6 +61,10 @@ MHUB_RELAY_JAR=/absolute/path/to/mhub-relay.jar npm run test:relay-e2e
 ```bash
 npm run dev:mobile
 ```
+
+Android/iOS 激活与代理运行需要公开构建配置 `EXPO_PUBLIC_MHUB_AGENT_ACTIVATION_API_URL` 和 `EXPO_PUBLIC_MHUB_RELAY_CONTROL_URL`。前者必须是 `/agent-api/v1/activations:exchange` HTTPS 端点，后者必须是 `/agent/v1/control` WSS 端点。`EXPO_PUBLIC_*` 会进入客户端包，只能放公开地址，不能放激活码、credential、ticket、私钥或内部代理 URI。
+
+移动端激活时生成 Ed25519 设备密钥，使用 Expo SecureStore 保存到 Android Keystore/iOS Keychain 保护的本机存储；每次控制 WSS 重连重新签名获取短期 ticket。当前不支持 Expo Go，需使用 Prebuild 后的开发客户端或原生构建。
 
 桌面开发需要两个终端。先启动 Expo Web，再启动 Electron Host：
 

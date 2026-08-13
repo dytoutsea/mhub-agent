@@ -78,4 +78,19 @@ describe("foreground mobile tunnel lifecycle", () => {
     expect(start).toHaveBeenCalledTimes(2);
     expect(stop).not.toHaveBeenCalled();
   });
+
+  it("can restart after the runtime reports an independent stop", async () => {
+    const start = vi.fn(async () => undefined);
+    const stop = vi.fn(async () => undefined);
+    const controller = createForegroundLifecycleController({ start, stop }, "active");
+
+    await controller.setDesiredRunning(true);
+    controller.runtimeStopped();
+    await controller.handleAppState("background");
+    await controller.handleAppState("active");
+    expect(start).toHaveBeenCalledTimes(1);
+    await controller.setDesiredRunning(true);
+
+    expect(start).toHaveBeenCalledTimes(2);
+  });
 });

@@ -4,6 +4,7 @@
     "includes": [
       "**",
       "!**/node_modules",
+      "!**/.agent-work",
       "!**/.expo",
       "!**/android",
       "!**/ios",

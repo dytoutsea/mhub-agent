@@ -109,7 +109,9 @@ export class MobileAgentRuntime {
     await this.connect();
   }
 
-  async stop(reason: "USER_REQUESTED" | "MOBILE_APP_BACKGROUND" = "USER_REQUESTED") {
+  async stop(
+    reason: "USER_REQUESTED" | "MOBILE_APP_BACKGROUND" | "APP_CONTEXT_DESTROYED" = "USER_REQUESTED",
+  ) {
     if (!this.desiredRunning && this.snapshot.state === "stopped") {
       return;
     }

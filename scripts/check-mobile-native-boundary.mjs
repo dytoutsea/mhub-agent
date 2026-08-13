@@ -3,6 +3,10 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 const manifestPath = resolve(root, "apps/mobile/android/app/src/main/AndroidManifest.xml");
+const secureStoreAndroidRoot = resolve(
+  root,
+  "node_modules/expo-secure-store/android/src/main/res/xml",
+);
 const iosRoot = resolve(root, "apps/mobile/ios");
 const iosProjectDirectory = readdirSync(iosRoot, { withFileTypes: true }).find(
   (entry) => entry.isDirectory() && !entry.name.endsWith(".xcodeproj") && entry.name !== "Pods",
@@ -17,6 +21,14 @@ const entitlementFiles = readdirSync(iosProjectRoot).filter((name) =>
 );
 
 const manifest = readFileSync(manifestPath, "utf8");
+const secureStoreBackupRules = readFileSync(
+  resolve(secureStoreAndroidRoot, "secure_store_backup_rules.xml"),
+  "utf8",
+);
+const secureStoreExtractionRules = readFileSync(
+  resolve(secureStoreAndroidRoot, "secure_store_data_extraction_rules.xml"),
+  "utf8",
+);
 const infoPlist = readFileSync(infoPlistPath, "utf8");
 const entitlements = entitlementFiles
   .map((name) => readFileSync(resolve(iosProjectRoot, name), "utf8"))
@@ -51,6 +63,14 @@ if (!requestedAndroidPermissions.has("android.permission.INTERNET")) {
 }
 if (/<service\b/.test(manifest)) {
   failures.push("Android services are outside the foreground-only MVP boundary");
+}
+if (
+  !manifest.includes('android:fullBackupContent="@xml/secure_store_backup_rules"') ||
+  !manifest.includes('android:dataExtractionRules="@xml/secure_store_data_extraction_rules"') ||
+  !secureStoreBackupRules.includes('<exclude domain="sharedpref" path="SecureStore"') ||
+  !secureStoreExtractionRules.includes('<exclude domain="sharedpref" path="SecureStore"')
+) {
+  failures.push("Android SecureStore must remain excluded from backup and device transfer");
 }
 if (infoPlist.includes("UIBackgroundModes")) {
   failures.push("forbidden iOS UIBackgroundModes");

@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@mhub/relay-protocol": "*",
+    "@noble/curves": "2.3.0",
     "ipaddr.js": "2.5.0",
     "ws": "8.18.3"
   },

@@ -5,6 +5,7 @@ node_modules/
 # Build and test output
 dist/
 build/
+.gradle/
 release/
 coverage/
 *.tsbuildinfo

@@ -4,7 +4,10 @@
     "slug": "mhub-agent",
     "version": "0.1.0",
     "orientation": "portrait",
-    "plugins": ["@mhub/mobile-data-tunnel"],
+    "plugins": [
+      "@mhub/mobile-data-tunnel",
+      ["expo-secure-store", { "configureAndroidBackup": true }]
+    ],
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.mhub.agent",

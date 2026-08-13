@@ -4,6 +4,15 @@
   "private": true,
   "main": "src/index.ts",
   "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "react-native": "./src/index.ts",
+      "browser": "./src/index.web.ts",
+      "default": "./src/index.ts"
+    },
+    "./lifecycle-controller": "./src/lifecycle-controller.ts"
+  },
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

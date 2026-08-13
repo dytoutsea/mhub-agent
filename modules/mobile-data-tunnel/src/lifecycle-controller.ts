@@ -3,6 +3,7 @@ export type ForegroundAppState = "active" | "inactive" | "background" | "unknown
 export interface ForegroundLifecycleController {
   setDesiredRunning(desired: boolean): Promise<void>;
   handleAppState(nextState: ForegroundAppState): Promise<void>;
+  runtimeStopped(): void;
   dispose(): Promise<void>;
 }
 
@@ -61,6 +62,10 @@ export function createForegroundLifecycleController(
       }
       appState = nextState;
       await reconcile();
+    },
+    runtimeStopped() {
+      desiredRunning = false;
+      running = false;
     },
     async dispose() {
       disposed = true;

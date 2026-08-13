@@ -1,5 +1,17 @@
 import path from "node:path";
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, session, shell, Tray } from "electron";
+import { pathToFileURL } from "node:url";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  nativeImage,
+  net,
+  protocol,
+  session,
+  shell,
+  Tray,
+} from "electron";
 
 import { ActivationManager } from "./activation-manager";
 import { DesktopAgentRuntime } from "./agent-runtime";
@@ -11,6 +23,7 @@ import {
   desktopChannels,
   hostInfoSchema,
 } from "./contracts";
+import { resolveRendererPath } from "./renderer-path";
 import { SafeStorageSecretStore } from "./secure-store";
 
 let mainWindow: BrowserWindow | null = null;
@@ -18,6 +31,13 @@ let agentRuntime: DesktopAgentRuntime | null = null;
 let activationManager: ActivationManager | null = null;
 let tray: Tray | null = null;
 let quitting = false;
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "mhub",
+    privileges: { standard: true, secure: true, supportFetchAPI: true },
+  },
+]);
 
 function hostPlatform(): "windows" | "macos" | "unsupported" {
   if (process.platform === "win32") {
@@ -147,6 +167,19 @@ function enforceProductionContentSecurityPolicy() {
   });
 }
 
+function registerRendererProtocol() {
+  const rendererRoot = app.isPackaged
+    ? path.join(process.resourcesPath, "renderer")
+    : path.join(app.getAppPath(), "../mobile/dist");
+  protocol.handle("mhub", (request) => {
+    const resolvedPath = resolveRendererPath(rendererRoot, request.url);
+    if (!resolvedPath) {
+      return new Response(null, { status: 404 });
+    }
+    return net.fetch(pathToFileURL(resolvedPath).toString());
+  });
+}
+
 async function createMainWindow() {
   const window = new BrowserWindow({
     backgroundColor: "#f4f6f8",
@@ -198,10 +231,7 @@ async function createMainWindow() {
   if (!app.isPackaged && developmentRendererUrl) {
     await window.loadURL(developmentRendererUrl);
   } else {
-    const rendererPath = app.isPackaged
-      ? path.join(process.resourcesPath, "renderer", "index.html")
-      : path.join(app.getAppPath(), "../mobile/dist/index.html");
-    await window.loadFile(rendererPath);
+    await window.loadURL("mhub://renderer/index.html");
   }
 
   mainWindow = window;
@@ -245,6 +275,7 @@ if (!ownsSingleInstanceLock) {
     }
     agentRuntime.subscribe(broadcastAgentState);
     registerIpcHandlers();
+    registerRendererProtocol();
     enforceProductionContentSecurityPolicy();
     createTray();
     await createMainWindow();

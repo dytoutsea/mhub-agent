@@ -1,11 +1,11 @@
 import * as Clipboard from "expo-clipboard";
 import {
   Activity,
-  CircleOff,
   Copy,
   FileText,
   Gauge,
   LoaderCircle,
+  Monitor,
   Power,
   Radio,
   ShieldCheck,
@@ -28,6 +28,13 @@ import {
   View,
 } from "react-native";
 
+import {
+  DesktopAgentController,
+  type DesktopAgentViewState,
+  type DesktopControllerSnapshot,
+  findDesktopBridge,
+  INITIAL_DESKTOP_SNAPSHOT,
+} from "./desktop-agent-controller";
 import type {
   MobileAgentControllerSnapshot,
   MobileAgentViewState,
@@ -36,11 +43,12 @@ import { createMobileAgentController } from "./mobile-platform";
 import { mobilePublicConfiguration } from "./mobile-public-configuration";
 
 type ViewName = "overview" | "logs";
+type AgentViewState = MobileAgentViewState | DesktopAgentViewState;
 
 interface StatusEvent {
   readonly id: number;
   readonly occurredAt: string;
-  readonly state: MobileAgentViewState;
+  readonly state: AgentViewState;
   readonly errorCode: string | null;
 }
 
@@ -69,7 +77,7 @@ export default function App() {
   const wide = width >= 720;
 
   if (Platform.OS !== "android" && Platform.OS !== "ios") {
-    return <DesktopRendererPlaceholder view={view} setView={setView} wide={wide} />;
+    return <DesktopAgentApp view={view} setView={setView} wide={wide} />;
   }
 
   return <MobileAgentApp view={view} setView={setView} wide={wide} />;
@@ -174,7 +182,7 @@ function MobileAgentApp({
   };
 
   return (
-    <AppShell view={view} setView={setView} state={snapshot.state}>
+    <AppShell state={snapshot.state} view={view} setView={setView} version="0.1.0">
       {view === "logs" ? (
         <EventLog events={events} />
       ) : snapshot.registration ? (
@@ -183,7 +191,15 @@ function MobileAgentApp({
           copied={copied}
           onCopy={() => void copyProxyId()}
           onToggle={() => void toggleRuntime()}
-          snapshot={snapshot}
+          notice="移动端仅在 App 前台时在线"
+          noticeIcon="mobile"
+          runtimeAction={snapshot.state === "stopped" ? "start" : "stop"}
+          snapshot={{
+            state: snapshot.state,
+            proxyId: snapshot.registration.proxyId,
+            activeStreams: snapshot.activeStreams,
+            errorCode: snapshot.errorCode,
+          }}
           wide={wide}
         />
       ) : (
@@ -204,11 +220,13 @@ function AppShell({
   view,
   setView,
   state,
+  version,
   children,
 }: {
   readonly view: ViewName;
   readonly setView: (view: ViewName) => void;
-  readonly state: MobileAgentViewState;
+  readonly state: AgentViewState;
+  readonly version: string;
   readonly children: React.ReactNode;
 }) {
   const status = statusPresentation(state);
@@ -219,7 +237,7 @@ function AppShell({
         <View style={styles.header}>
           <View>
             <Text style={styles.productName}>MHub Agent</Text>
-            <Text style={styles.version}>v0.1.0</Text>
+            <Text style={styles.version}>v{version}</Text>
           </View>
           <View style={styles.headerState}>
             <View style={[styles.stateDot, { backgroundColor: status.color }]} />
@@ -306,20 +324,32 @@ function ActivationPanel({
 function RegisteredOverview({
   busy,
   copied,
+  notice,
+  noticeIcon,
   onCopy,
   onToggle,
+  runtimeAction,
   snapshot,
   wide,
 }: {
   readonly busy: boolean;
   readonly copied: boolean;
+  readonly notice: string;
+  readonly noticeIcon: "desktop" | "mobile";
   readonly onCopy: () => void;
   readonly onToggle: () => void;
-  readonly snapshot: MobileAgentControllerSnapshot;
+  readonly runtimeAction: "start" | "stop" | "disabled";
+  readonly snapshot: {
+    readonly state: AgentViewState;
+    readonly proxyId: string | null;
+    readonly activeStreams: number;
+    readonly errorCode: string | null;
+  };
   readonly wide: boolean;
 }) {
   const status = statusPresentation(snapshot.state);
-  const running = snapshot.state !== "stopped" && snapshot.state !== "unavailable";
+  const running = runtimeAction === "stop";
+  const actionDisabled = busy || runtimeAction === "disabled";
   return (
     <View style={styles.section}>
       <View style={styles.statusBand}>
@@ -342,7 +372,7 @@ function RegisteredOverview({
         <Metric
           icon={<Activity color={STATUS_COLORS.teal} size={20} />}
           label="代理 ID"
-          value={snapshot.registration?.proxyId ?? "--"}
+          value={snapshot.proxyId ?? "--"}
           wide={wide}
         />
         <Metric
@@ -362,14 +392,14 @@ function RegisteredOverview({
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityState={{ disabled: busy, busy }}
-          disabled={busy}
+          accessibilityState={{ disabled: actionDisabled, busy }}
+          disabled={actionDisabled}
           onPress={onToggle}
           style={({ pressed }) => [
             styles.primaryButton,
             running && styles.stopButton,
-            busy && styles.buttonDisabled,
-            pressed && !busy && styles.buttonPressed,
+            actionDisabled && styles.buttonDisabled,
+            pressed && !actionDisabled && styles.buttonPressed,
           ]}
         >
           {running ? (
@@ -383,8 +413,12 @@ function RegisteredOverview({
       {copied ? <Text style={styles.copiedText}>代理 ID 已复制</Text> : null}
 
       <View style={styles.notice}>
-        <Smartphone color={STATUS_COLORS.warning} size={18} />
-        <Text style={styles.noticeText}>移动端仅在 App 前台时在线</Text>
+        {noticeIcon === "mobile" ? (
+          <Smartphone color={STATUS_COLORS.warning} size={18} />
+        ) : (
+          <Monitor color={STATUS_COLORS.warning} size={18} />
+        )}
+        <Text style={styles.noticeText}>{notice}</Text>
       </View>
     </View>
   );
@@ -420,22 +454,137 @@ function EventLog({ events }: { readonly events: readonly StatusEvent[] }) {
   );
 }
 
-function DesktopRendererPlaceholder({
+function DesktopAgentApp({
   view,
   setView,
+  wide,
 }: {
   readonly view: ViewName;
   readonly setView: (view: ViewName) => void;
   readonly wide: boolean;
 }) {
+  const [snapshot, setSnapshot] = useState<DesktopControllerSnapshot>(INITIAL_DESKTOP_SNAPSHOT);
+  const [activationCode, setActivationCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const [events, setEvents] = useState<readonly StatusEvent[]>([]);
+  const eventId = useRef(0);
+  const controller = useMemo(
+    () =>
+      new DesktopAgentController(findDesktopBridge(), (next) => {
+        setSnapshot(next);
+        setEvents((current) =>
+          [
+            {
+              id: ++eventId.current,
+              occurredAt: new Date().toISOString(),
+              state: next.state,
+              errorCode: next.errorCode,
+            },
+            ...current,
+          ].slice(0, 100),
+        );
+      }),
+    [],
+  );
+
+  useEffect(() => {
+    void controller.initialize();
+    return () => controller.dispose();
+  }, [controller]);
+
+  const activate = async () => {
+    if (busy || (snapshot.state !== "unregistered" && snapshot.state !== "revoked")) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await controller.activate(activationCode);
+      setActivationCode("");
+    } catch {
+      // The controller publishes only a stable, sanitized error code.
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runtimeAction = desktopRuntimeAction(snapshot.state);
+  const toggleRuntime = async () => {
+    if (busy || runtimeAction === "disabled") {
+      return;
+    }
+    setBusy(true);
+    try {
+      if (runtimeAction === "start") {
+        await controller.start();
+      } else {
+        await controller.stop();
+      }
+    } catch {
+      // The controller publishes only a stable, sanitized error code.
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copyProxyId = async () => {
+    if (!snapshot.proxyId) {
+      return;
+    }
+    try {
+      await Clipboard.setStringAsync(snapshot.proxyId);
+      setCopyError(null);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1_500);
+    } catch {
+      setCopyError("CLIPBOARD_WRITE_FAILED");
+    }
+  };
+
   return (
-    <AppShell view={view} setView={setView} state="unregistered">
-      <View style={styles.emptyState}>
-        <CircleOff color={STATUS_COLORS.muted} size={30} />
-        <Text style={styles.emptyTitle}>桌面宿主尚未连接</Text>
-      </View>
+    <AppShell
+      state={snapshot.state}
+      view={view}
+      setView={setView}
+      version={snapshot.appVersion ?? "0.1.0"}
+    >
+      {view === "logs" ? (
+        <EventLog events={events} />
+      ) : snapshot.proxyId && snapshot.state !== "revoked" ? (
+        <RegisteredOverview
+          busy={busy}
+          copied={copied}
+          notice="关闭窗口后代理仍会在系统托盘中运行"
+          noticeIcon="desktop"
+          onCopy={() => void copyProxyId()}
+          onToggle={() => void toggleRuntime()}
+          runtimeAction={runtimeAction}
+          snapshot={{ ...snapshot, errorCode: copyError ?? snapshot.errorCode }}
+          wide={wide}
+        />
+      ) : (
+        <ActivationPanel
+          activationCode={activationCode}
+          busy={busy}
+          errorCode={snapshot.errorCode}
+          onActivate={() => void activate()}
+          onChange={setActivationCode}
+          ready={snapshot.state === "unregistered" || snapshot.state === "revoked"}
+        />
+      )}
     </AppShell>
   );
+}
+
+function desktopRuntimeAction(state: DesktopAgentViewState): "start" | "stop" | "disabled" {
+  if (state === "stopped" || state === "degraded") {
+    return "start";
+  }
+  if (state === "connecting" || state === "online" || state === "backoff" || state === "paused") {
+    return "stop";
+  }
+  return "disabled";
 }
 
 function Tab({
@@ -487,7 +636,7 @@ function foregroundState(value: AppStateStatus): "active" | "inactive" | "backgr
   return value === "active" || value === "inactive" || value === "background" ? value : "unknown";
 }
 
-function statusPresentation(state: MobileAgentViewState) {
+function statusPresentation(state: AgentViewState) {
   switch (state) {
     case "loading":
       return { label: "载入中", title: "正在载入", detail: "", color: STATUS_COLORS.muted };
@@ -521,6 +670,27 @@ function statusPresentation(state: MobileAgentViewState) {
         detail: "网络恢复后将自动重试",
         color: STATUS_COLORS.warning,
       };
+    case "degraded":
+      return {
+        label: "连接异常",
+        title: "代理连接异常",
+        detail: "请检查网络后重新启动",
+        color: STATUS_COLORS.danger,
+      };
+    case "paused":
+      return {
+        label: "已暂停",
+        title: "代理已暂停",
+        detail: "当前会话暂不接收新连接",
+        color: STATUS_COLORS.warning,
+      };
+    case "revoked":
+      return {
+        label: "已撤销",
+        title: "代理凭证已撤销",
+        detail: "请在控制台重新激活此设备",
+        color: STATUS_COLORS.danger,
+      };
     case "unavailable":
       return {
         label: "不可用",
@@ -540,8 +710,20 @@ function friendlyError(code: string): string {
   }
   const messages: Record<string, string> = {
     ACTIVATION_CODE_INVALID: "激活码格式不正确",
+    ACTIVATION_CONFIGURATION_REQUIRED: "桌面客户端服务地址尚未配置",
+    ACTIVATION_RESPONSE_INVALID: "激活服务返回了无效数据",
+    AGENT_ALREADY_STARTED: "代理已经启动",
+    AGENT_CONFIGURATION_REQUIRED: "客户端尚未激活",
+    AGENT_RUNTIME_UNAVAILABLE: "桌面代理运行时不可用",
+    AGENT_START_FAILED: "代理启动失败，请稍后重试",
+    CLIPBOARD_WRITE_FAILED: "无法写入系统剪贴板",
     CONFIGURATION_REQUIRED: "客户端服务地址尚未配置",
     CONTROL_CHANNEL_CLOSED: "Relay 连接已断开",
+    DESKTOP_ACTIVATION_FAILED: "激活失败，请检查激活码",
+    DESKTOP_BRIDGE_UNAVAILABLE: "请通过 MHub 桌面客户端打开此页面",
+    DESKTOP_INITIALIZATION_FAILED: "桌面客户端初始化失败",
+    DESKTOP_START_FAILED: "代理启动失败，请稍后重试",
+    DESKTOP_STOP_FAILED: "代理停止失败，请稍后重试",
     MOBILE_TUNNEL_STOP_FAILED: "本地数据通道停止失败",
     SECURE_STORAGE_DATA_INVALID: "本机设备凭证已损坏",
     SECURE_STORAGE_READ_FAILED: "无法读取本机安全凭证",

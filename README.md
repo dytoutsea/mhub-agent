@@ -1,6 +1,6 @@
 # MHub Agent
 
-MHub Windows、macOS、Android 和 iOS 客户端的独立 monorepo。桌面端使用 Electron，移动端和共享界面使用 Expo。当前已实现 Node/Electron 控制链路、Android/iOS 前台原生数据通道，以及两端共用的移动激活、设备签名和控制 WSS 编排。
+MHub Windows、macOS、Android 和 iOS 客户端的独立 monorepo。桌面端使用 Electron，移动端和共享界面使用 Expo。当前已实现 Node/Electron 控制链路、桌面 Renderer 操作界面、Android/iOS 前台原生数据通道，以及移动端激活、设备签名和控制 WSS 编排。
 
 ## 当前边界
 
@@ -85,9 +85,11 @@ npm run dev:desktop
 
 ### Electron Agent Runtime 开发配置
 
-Electron Main Process 持有 Relay Agent 生命周期，Renderer 只通过版本化 IPC 获取快照、启动/停止和接收脱敏状态事件。桌面激活和安全存储已在当前切片接入，后续再补托盘交互和正式配置分发。
+Electron Main Process 持有 Relay Agent 生命周期，Renderer 只通过版本化 IPC 获取快照、激活、启动/停止和接收脱敏状态事件。桌面 Renderer 已支持激活码输入、代理 ID 复制、状态与活动连接展示、启停控制，以及最多 100 条脱敏状态事件。关闭窗口后 Agent 继续由系统托盘托管；正式配置分发、品牌托盘图标和安装包平台验收仍待完成。
 
 当前桌面激活入口为 `agent.activate({ activationCode })`。Main 使用 Electron `safeStorage` 保存设备私钥和一次性 refresh credential 的加密配置；需要设置 `MHUB_AGENT_ACTIVATION_API_URL` 与 `MHUB_RELAY_CONTROL_URL` 才会启用该入口。
+
+生产构建通过受限的 `mhub://renderer/` 安全协议加载 Expo Web 静态资源，只允许访问打包后的 Renderer 目录。Renderer 不导入 Electron、Node、文件系统、Socket 或凭证 API；Preload 之外运行页面时会显示宿主不可用状态并禁用敏感操作。
 
 隔离本地协议测试可通过被忽略的进程环境变量注入配置：`MHUB_RELAY_CONTROL_URL`、`MHUB_PROXY_ID`，以及静态测试 ticket `MHUB_RELAY_TICKET`，或动态 ticket 组合 `MHUB_AGENT_API_URL`、`MHUB_CREDENTIAL_ID`、`MHUB_DEVICE_PRIVATE_KEY`。这些值不会展示或写入日志。
 

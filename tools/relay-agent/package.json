@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@mhub/relay-protocol": "*",
     "ipaddr.js": "2.5.0",
     "ws": "8.18.3"
   },

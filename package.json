@@ -10,7 +10,7 @@
     "tools/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace @mhub/shared && npm run build --workspace @mhub/sdk-poc && npm run build --workspace @mhub/relay-agent && npm run build --workspace @mhub/mobile && npm run build --workspace @mhub/desktop",
+    "build": "npm run build --workspace @mhub/shared && npm run build --workspace @mhub/relay-protocol && npm run build --workspace @mhub/mobile-runtime && npm run build --workspace @mhub/sdk-poc && npm run build --workspace @mhub/relay-agent && npm run build --workspace @mhub/mobile && npm run build --workspace @mhub/desktop",
     "check": "biome check .",
     "check:write": "biome check --write .",
     "dev:mobile": "npm run start --workspace @mhub/mobile",

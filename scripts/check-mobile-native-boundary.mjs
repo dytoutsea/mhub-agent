@@ -15,6 +15,14 @@ if (!iosProjectDirectory) {
   throw new Error("Mobile native boundary check could not locate the generated iOS project");
 }
 const iosProjectRoot = resolve(iosRoot, iosProjectDirectory.name);
+const iosTunnelSource = readFileSync(
+  resolve(root, "modules/mobile-data-tunnel/ios/IOSDataStream.swift"),
+  "utf8",
+);
+const iosTunnelModule = readFileSync(
+  resolve(root, "modules/mobile-data-tunnel/ios/MHubMobileDataTunnelModule.swift"),
+  "utf8",
+);
 const infoPlistPath = resolve(iosProjectRoot, "Info.plist");
 const entitlementFiles = readdirSync(iosProjectRoot).filter((name) =>
   name.endsWith(".entitlements"),
@@ -77,6 +85,13 @@ if (infoPlist.includes("UIBackgroundModes")) {
 }
 if (entitlements.includes("com.apple.developer.networking.networkextension")) {
   failures.push("forbidden iOS Network Extension entitlement");
+}
+if (
+  !iosTunnelSource.includes("URLSessionWebSocketTask") ||
+  !iosTunnelSource.includes("NWConnection") ||
+  iosTunnelModule.includes("MOBILE_DATA_TUNNEL_STREAMS_NOT_IMPLEMENTED")
+) {
+  failures.push("iOS foreground native data stream implementation is missing");
 }
 if (
   readdirSync(iosProjectRoot, { recursive: true }).some((path) => String(path).endsWith(".appex"))

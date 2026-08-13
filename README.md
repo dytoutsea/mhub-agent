@@ -1,12 +1,12 @@
 # MHub Agent
 
-MHub Windows、macOS、Android 和 iOS 客户端的独立 monorepo。桌面端使用 Electron，移动端和共享界面使用 Expo。当前已实现 Node/Electron 控制链路、Android 前台数据通道，以及 Android/iOS 共用的移动激活、设备签名和控制 WSS 编排；iOS 原生数据通道仍在开发。
+MHub Windows、macOS、Android 和 iOS 客户端的独立 monorepo。桌面端使用 Electron，移动端和共享界面使用 Expo。当前已实现 Node/Electron 控制链路、Android/iOS 前台原生数据通道，以及两端共用的移动激活、设备签名和控制 WSS 编排。
 
 ## 当前边界
 
 - Windows/macOS：Electron Main Process 持有 AgentRuntime，Renderer 使用 Expo Web 导出。
 - Android/iOS：第一期只在 App 前台运行，进入后台或锁屏时必须下线。
-- Android 数据通道由 Kotlin 原生模块实现；iOS Swift 实现尚未完成。业务字节不得经过 React Native JS Bridge。
+- Android 数据通道由 Kotlin 实现，iOS 数据通道由 Swift、Network.framework 和 `URLSessionWebSocketTask` 实现。业务字节不得经过 React Native JS Bridge。
 - Relay 协议 v1 Schema 由 `mhub-relay` 持有，本仓库维护严格消费者实现和兼容测试。
 - 不包含 Android Foreground Service、iOS Network Extension 或后台保活。
 
@@ -65,6 +65,14 @@ npm run dev:mobile
 Android/iOS 激活与代理运行需要公开构建配置 `EXPO_PUBLIC_MHUB_AGENT_ACTIVATION_API_URL` 和 `EXPO_PUBLIC_MHUB_RELAY_CONTROL_URL`。前者必须是 `/agent-api/v1/activations:exchange` HTTPS 端点，后者必须是 `/agent/v1/control` WSS 端点。`EXPO_PUBLIC_*` 会进入客户端包，只能放公开地址，不能放激活码、credential、ticket、私钥或内部代理 URI。
 
 移动端激活时生成 Ed25519 设备密钥，使用 Expo SecureStore 保存到 Android Keystore/iOS Keychain 保护的本机存储；每次控制 WSS 重连重新签名获取短期 ticket。当前不支持 Expo Go，需使用 Prebuild 后的开发客户端或原生构建。
+
+iOS 原生确定性门禁可在 macOS 执行：
+
+```bash
+npm run mobile:ios:native:test
+```
+
+该门禁对 Swift 数据流源码执行类型检查，并验证 IP 字面量/保留地址策略、WSS 路径编码、严格 `DATA_HELLO`/`DATA_ACCEPTED` 和错误码脱敏。完整 iOS App 编译、签名和真机数据转发仍需要当前 Xcode、CocoaPods 和开发设备。
 
 桌面开发需要两个终端。先启动 Expo Web，再启动 Electron Host：
 

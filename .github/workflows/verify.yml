@@ -22,3 +22,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run verify
+
+  ios-native:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run mobile:ios:native:test

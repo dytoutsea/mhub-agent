@@ -93,6 +93,23 @@ export class DesktopAgentRuntime {
     return this.snapshot;
   }
 
+  async pause(errorCode: "NETWORK_OFFLINE" | "SYSTEM_SUSPENDED"): Promise<AgentSnapshot> {
+    const agent = this.agent;
+    this.agent = null;
+    if (agent) {
+      await agent.stop();
+    }
+    if (this.snapshot.state !== "unregistered") {
+      this.update({
+        state: "paused",
+        activeStreams: 0,
+        connectedAt: null,
+        errorCode,
+      });
+    }
+    return this.snapshot;
+  }
+
   private handleAgentEvent(event: RelayAgentEvent) {
     if (event.type === "online") {
       this.connectedAt = new Date().toISOString();

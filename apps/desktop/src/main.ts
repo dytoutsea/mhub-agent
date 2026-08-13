@@ -7,6 +7,7 @@ import {
   Menu,
   nativeImage,
   net,
+  powerMonitor,
   protocol,
   session,
   shell,
@@ -23,13 +24,16 @@ import {
   desktopChannels,
   hostInfoSchema,
 } from "./contracts";
+import { FileDesktopPreferencesStore } from "./desktop-preferences";
 import { resolveRendererPath } from "./renderer-path";
 import { SafeStorageSecretStore } from "./secure-store";
+import { DesktopSystemLifecycle } from "./system-lifecycle";
 
 let mainWindow: BrowserWindow | null = null;
 let agentRuntime: DesktopAgentRuntime | null = null;
 let activationManager: ActivationManager | null = null;
 let tray: Tray | null = null;
+let systemLifecycle: DesktopSystemLifecycle | null = null;
 let quitting = false;
 
 protocol.registerSchemesAsPrivileged([
@@ -63,13 +67,15 @@ function registerIpcHandlers() {
     if (!agentRuntime) {
       throw new Error("AGENT_RUNTIME_UNAVAILABLE");
     }
-    return agentSnapshotSchema.parse(await agentRuntime.start());
+    await systemLifecycle?.requestStart();
+    return agentSnapshotSchema.parse(agentRuntime.getSnapshot());
   });
   ipcMain.handle(desktopChannels.agentStop, async () => {
     if (!agentRuntime) {
       throw new Error("AGENT_RUNTIME_UNAVAILABLE");
     }
-    return agentSnapshotSchema.parse(await agentRuntime.stop());
+    await systemLifecycle?.requestStop();
+    return agentSnapshotSchema.parse(agentRuntime.getSnapshot());
   });
   ipcMain.handle(desktopChannels.agentActivate, async (_event, payload: unknown) => {
     if (!activationManager) {
@@ -80,6 +86,7 @@ function registerIpcHandlers() {
     await agentRuntime?.stop();
     agentRuntime = new DesktopAgentRuntime(hostPlatform(), activated.config);
     agentRuntime.subscribe(broadcastAgentState);
+    await systemLifecycle?.activated();
     return activationResultSchema.parse(activated.result);
   });
 }
@@ -98,6 +105,11 @@ function updateTrayMenu() {
   }
   const snapshot = agentRuntime.getSnapshot();
   const canStart = snapshot.state === "stopped" || snapshot.state === "degraded";
+  const canStop =
+    snapshot.state === "online" ||
+    snapshot.state === "connecting" ||
+    snapshot.state === "backoff" ||
+    snapshot.state === "paused";
   tray.setContextMenu(
     Menu.buildFromTemplate([
       {
@@ -112,12 +124,12 @@ function updateTrayMenu() {
       {
         label: "启动代理",
         enabled: canStart,
-        click: () => void agentRuntime?.start().catch(() => undefined),
+        click: () => void systemLifecycle?.requestStart().catch(() => undefined),
       },
       {
         label: "停止代理",
-        enabled: snapshot.state === "online" || snapshot.state === "connecting",
-        click: () => void agentRuntime?.stop(),
+        enabled: canStop,
+        click: () => void systemLifecycle?.requestStop(),
       },
       { type: "separator" },
       {
@@ -165,6 +177,34 @@ function enforceProductionContentSecurityPolicy() {
       },
     });
   });
+}
+
+function applyLoginItem(enabled: boolean) {
+  if (!app.isPackaged || hostPlatform() === "unsupported") {
+    return;
+  }
+  app.setLoginItemSettings({ openAtLogin: enabled });
+}
+
+function registerSystemLifecycleEvents() {
+  powerMonitor.on("suspend", () => {
+    void systemLifecycle?.suspend().catch(() => undefined);
+  });
+  powerMonitor.on("resume", () => {
+    void systemLifecycle
+      ?.networkChanged(net.isOnline())
+      .then(() => systemLifecycle?.resume())
+      .catch(() => undefined);
+  });
+  let previousOnline = net.isOnline();
+  const networkTimer = setInterval(() => {
+    const online = net.isOnline();
+    if (online !== previousOnline) {
+      previousOnline = online;
+      void systemLifecycle?.networkChanged(online).catch(() => undefined);
+    }
+  }, 5_000);
+  networkTimer.unref();
 }
 
 function registerRendererProtocol() {
@@ -274,10 +314,20 @@ if (!ownsSingleInstanceLock) {
       agentRuntime = new DesktopAgentRuntime(hostPlatform());
     }
     agentRuntime.subscribe(broadcastAgentState);
+    systemLifecycle = new DesktopSystemLifecycle({
+      runtime: () => agentRuntime,
+      preferences: new FileDesktopPreferencesStore(
+        path.join(app.getPath("userData"), "desktop-preferences.json"),
+      ),
+      applyLoginItem,
+      isOnline: () => net.isOnline(),
+    });
     registerIpcHandlers();
     registerRendererProtocol();
     enforceProductionContentSecurityPolicy();
     createTray();
+    registerSystemLifecycleEvents();
+    await systemLifecycle.initialize().catch(() => undefined);
     await createMainWindow();
 
     app.on("activate", () => {

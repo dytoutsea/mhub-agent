@@ -28,4 +28,21 @@ describe("DesktopAgentRuntime", () => {
     expect(runtime.getSnapshot()).not.toHaveProperty("ticket");
     expect(runtime.getSnapshot()).not.toHaveProperty("devicePrivateKey");
   });
+
+  it("publishes a sanitized paused state for a system interruption", async () => {
+    const runtime = new DesktopAgentRuntime("windows", {
+      controlUrl: "wss://relay.example.test/agent/v1/control",
+      proxyId: "cpx_01K1D1NJ000000000000008003",
+      ticket: "ticket-must-not-escape",
+    });
+
+    await runtime.pause("SYSTEM_SUSPENDED");
+
+    expect(runtime.getSnapshot()).toMatchObject({
+      state: "paused",
+      activeStreams: 0,
+      connectedAt: null,
+      errorCode: "SYSTEM_SUSPENDED",
+    });
+  });
 });

@@ -2,6 +2,8 @@ import { nativeMobileDataTunnel } from "./native-module";
 import type {
   EventSubscription,
   MobileDataTunnel,
+  MobileStreamOpenRequest,
+  MobileStreamOpenResult,
   MobileTunnelConfiguration,
   MobileTunnelEvents,
   MobileTunnelSnapshot,
@@ -31,9 +33,21 @@ export const mobileDataTunnel: MobileDataTunnel = {
   getSnapshot(): Promise<MobileTunnelSnapshot> {
     return requireModule().getSnapshot();
   },
-  addListener(
-    eventName: "onStateChanged",
-    listener: MobileTunnelEvents["onStateChanged"],
+  openStream(request: MobileStreamOpenRequest): Promise<MobileStreamOpenResult> {
+    return requireModule().openStream(
+      request.connectionId,
+      request.connectionToken,
+      request.host,
+      request.port,
+      request.connectTimeoutMs,
+    );
+  },
+  closeStream(connectionId: string): Promise<MobileTunnelSnapshot> {
+    return requireModule().closeStream(connectionId);
+  },
+  addListener<EventName extends keyof MobileTunnelEvents>(
+    eventName: EventName,
+    listener: MobileTunnelEvents[EventName],
   ): EventSubscription {
     return requireModule().addListener(eventName, listener);
   },

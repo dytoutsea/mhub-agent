@@ -12,7 +12,7 @@ public final class MHubMobileDataTunnelModule: Module {
 
   public func definition() -> ModuleDefinition {
     Name("MHubMobileDataTunnel")
-    Events("onStateChanged")
+    Events("onStateChanged", "onStreamClosed")
 
     OnCreate {
       self.withLock {
@@ -60,6 +60,17 @@ public final class MHubMobileDataTunnelModule: Module {
       return self.withLock {
         self.foreground = active
         return self.snapshot()
+      }
+    }
+
+    AsyncFunction("openStream") {
+      (_: String, _: String, _: String, _: Int, _: Int) -> [String: Any?] in
+      throw MobileTunnelError("MOBILE_DATA_TUNNEL_STREAMS_NOT_IMPLEMENTED")
+    }
+
+    AsyncFunction("closeStream") { (_: String) -> [String: Any?] in
+      return self.withLock {
+        self.snapshot()
       }
     }
 

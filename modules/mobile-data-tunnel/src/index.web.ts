@@ -12,5 +12,7 @@ export const mobileDataTunnel: MobileDataTunnel = {
   start: async () => unsupported(),
   stop: async () => unsupported(),
   getSnapshot: async () => unsupported(),
+  openStream: async () => unsupported(),
+  closeStream: async () => unsupported(),
   addListener: () => unsupported(),
 };

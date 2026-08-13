@@ -12,6 +12,25 @@ export interface MobileTunnelConfiguration {
   readonly maxStreams: number;
 }
 
+export interface MobileStreamOpenRequest {
+  readonly connectionId: string;
+  readonly connectionToken: string;
+  readonly host: string;
+  readonly port: number;
+  readonly connectTimeoutMs: number;
+}
+
+export interface MobileStreamOpenResult {
+  readonly connectionId: string;
+  readonly status: "ready" | "failed";
+  readonly reason: string | null;
+}
+
+export interface MobileStreamClosedEvent {
+  readonly connectionId: string;
+  readonly reason: string;
+}
+
 export type MobileTunnelStopReason =
   | "USER_REQUESTED"
   | "MOBILE_APP_BACKGROUND"
@@ -19,6 +38,7 @@ export type MobileTunnelStopReason =
 
 export type MobileTunnelEvents = {
   readonly onStateChanged: (snapshot: MobileTunnelSnapshot) => void;
+  readonly onStreamClosed: (event: MobileStreamClosedEvent) => void;
 };
 
 export interface EventSubscription {
@@ -30,8 +50,10 @@ export interface MobileDataTunnel {
   start(): Promise<MobileTunnelSnapshot>;
   stop(reason: MobileTunnelStopReason): Promise<MobileTunnelSnapshot>;
   getSnapshot(): Promise<MobileTunnelSnapshot>;
-  addListener(
-    eventName: "onStateChanged",
-    listener: MobileTunnelEvents["onStateChanged"],
+  openStream(request: MobileStreamOpenRequest): Promise<MobileStreamOpenResult>;
+  closeStream(connectionId: string): Promise<MobileTunnelSnapshot>;
+  addListener<EventName extends keyof MobileTunnelEvents>(
+    eventName: EventName,
+    listener: MobileTunnelEvents[EventName],
   ): EventSubscription;
 }

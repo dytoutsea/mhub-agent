@@ -36,6 +36,10 @@ jobs:
           npm run check
           npm run typecheck
           npm run test
+      - name: Validate mobile native boundary on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
           npm run mobile:native:check
           npm run expo:check
       - name: Export Expo Web renderer

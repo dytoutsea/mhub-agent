@@ -67,4 +67,11 @@ describe("relay protocol v1", () => {
       parseDataAccepted('{"type":"DATA_ACCEPTED","connection_id":"other"}', "expected"),
     ).toThrow("DATA_PAIRING_REJECTED");
   });
+
+  it("parses the relay heartbeat response", () => {
+    expect(parseRelayMessage('{"type":"PONG","nonce":"heartbeat-1"}')).toEqual({
+      type: "PONG",
+      nonce: "heartbeat-1",
+    });
+  });
 });

@@ -73,6 +73,8 @@ export class MobileAgentRuntime {
   private generation = 0;
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private heartbeatNonce = 0;
   private messageQueue = Promise.resolve();
   private tunnelLifecycleQueue = Promise.resolve();
   private snapshot: MobileRuntimeSnapshot;
@@ -118,6 +120,7 @@ export class MobileAgentRuntime {
     this.desiredRunning = false;
     this.generation += 1;
     this.clearReconnect();
+    this.clearHeartbeat();
     this.streamClosedSubscription?.remove();
     this.streamClosedSubscription = null;
     const socket = this.socket;
@@ -212,9 +215,12 @@ export class MobileAgentRuntime {
         }
         this.reconnectAttempt = 0;
         this.publish("online", null);
+        this.startHeartbeat(socket, generation, message.heartbeat_interval_ms);
         return;
       case "PING":
         this.sendOn(socket, { type: "PONG", nonce: message.nonce });
+        return;
+      case "PONG":
         return;
       case "OPEN_REQUEST":
         void this.openStream(socket, generation, message).catch(() =>
@@ -334,6 +340,7 @@ export class MobileAgentRuntime {
       return;
     }
     this.socket = null;
+    this.clearHeartbeat();
     this.cancelStreams();
     if (!this.desiredRunning) {
       this.publish("stopped", null);
@@ -405,6 +412,29 @@ export class MobileAgentRuntime {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+  }
+
+  private startHeartbeat(socket: ControlSocket, generation: number, intervalMs: number): void {
+    this.clearHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      if (
+        this.isCurrent(generation) &&
+        this.socket === socket &&
+        this.snapshot.state === "online"
+      ) {
+        this.sendOn(socket, {
+          type: "PING",
+          nonce: `${this.now().toString(36)}-${(++this.heartbeatNonce).toString(36)}`,
+        });
+      }
+    }, intervalMs);
+  }
+
+  private clearHeartbeat(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
     }
   }
 

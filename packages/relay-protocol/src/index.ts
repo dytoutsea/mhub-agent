@@ -30,10 +30,15 @@ export interface OpenRequest {
   readonly connect_timeout_ms: number;
 }
 
-export type RelayMessage = Welcome | OpenRequest | Ping | ConnectionClosed | GoAway;
+export type RelayMessage = Welcome | OpenRequest | Ping | Pong | ConnectionClosed | GoAway;
 
 export interface Ping {
   readonly type: "PING";
+  readonly nonce: string;
+}
+
+export interface Pong {
+  readonly type: "PONG";
   readonly nonce: string;
 }
 
@@ -112,6 +117,10 @@ export function parseRelayMessage(value: string): RelayMessage {
     };
   }
   if (type === "PING") {
+    requireFields(message, ["type", "nonce"]);
+    return { type, nonce: text(message, "nonce", 128) };
+  }
+  if (type === "PONG") {
     requireFields(message, ["type", "nonce"]);
     return { type, nonce: text(message, "nonce", 128) };
   }

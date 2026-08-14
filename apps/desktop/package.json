@@ -4,7 +4,7 @@
   "private": true,
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsup src/main.ts src/preload.ts --format cjs --platform node --out-dir dist --clean",
+    "build": "tsup --config tsup.config.ts",
     "dev": "npm run build && cross-env MHUB_RENDERER_URL=http://localhost:8081 electron .",
     "package": "npm run build && electron-builder",
     "package:unsigned": "npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --publish never",

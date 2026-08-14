@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { createConnection, type Socket } from "node:net";
 
 import WebSocket, { type RawData } from "ws";
@@ -29,6 +30,7 @@ export class RelayAgent {
   private readonly streams = new Map<string, AgentStream>();
   private stopping = false;
   private reconnectTimer: NodeJS.Timeout | null = null;
+  private heartbeatTimer: NodeJS.Timeout | null = null;
   private reconnectAttempt = 0;
 
   constructor(private readonly options: RelayAgentOptions) {
@@ -80,6 +82,7 @@ export class RelayAgent {
       return;
     }
     this.control = null;
+    this.clearHeartbeat();
     this.stopStreams();
     if (this.stopping || !this.options.sessionTicketClient || this.reconnectTimer) {
       return;
@@ -108,6 +111,7 @@ export class RelayAgent {
       return;
     }
     this.stopping = true;
+    this.clearHeartbeat();
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -128,10 +132,13 @@ export class RelayAgent {
       const message = parseRelayMessage(raw);
       switch (message.type) {
         case "WELCOME":
+          this.startHeartbeat(message.heartbeat_interval_ms);
           this.options.onEvent?.({ type: "online" });
           return;
         case "PING":
           this.sendControl({ type: "PONG", nonce: message.nonce });
+          return;
+        case "PONG":
           return;
         case "OPEN_REQUEST":
           void this.openStream(message);
@@ -193,6 +200,20 @@ export class RelayAgent {
   private sendControl(message: object) {
     if (this.control?.readyState === WebSocket.OPEN) {
       this.control.send(JSON.stringify(message));
+    }
+  }
+
+  private startHeartbeat(intervalMillis: number) {
+    this.clearHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      this.sendControl({ type: "PING", nonce: randomUUID() });
+    }, intervalMillis);
+  }
+
+  private clearHeartbeat() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
     }
   }
 

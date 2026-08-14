@@ -154,7 +154,7 @@ describe("MobileAgentIdentityManager", () => {
 
 function createManager(
   store: MobileSecretStore,
-  fetchImpl: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+  fetchImpl: (input: RequestInfo, init?: RequestInit) => Promise<Response>,
   cryptoOverrides: Partial<MobileDeviceCrypto> = {},
 ): MobileAgentIdentityManager {
   return new MobileAgentIdentityManager({

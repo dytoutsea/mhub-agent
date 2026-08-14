@@ -40,7 +40,7 @@ export interface MobileAgentIdentityOptions {
   readonly osVersion?: string;
 }
 
-type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+type FetchLike = (input: RequestInfo, init?: RequestInit) => Promise<Response>;
 
 interface StoredIdentity extends MobileAgentRegistration {
   readonly activationApiUrl: string;
@@ -85,7 +85,7 @@ export class MobileAgentIdentityManager {
     try {
       requireBytes(keyPair.privateKey, 32, "DEVICE_PRIVATE_KEY_INVALID");
       requireBytes(keyPair.publicKey, 32, "DEVICE_PUBLIC_KEY_INVALID");
-      const response = await this.fetchImpl(this.activationEndpoint, {
+      const response = await this.fetchImpl(this.activationEndpoint.toString(), {
         method: "POST",
         headers: {
           Accept: "application/json",
@@ -171,7 +171,7 @@ export class MobileAgentIdentityManager {
       }
       try {
         requireBytes(signature, 64, "DEVICE_SIGNATURE_INVALID");
-        const response = await this.fetchImpl(this.sessionTicketEndpoint, {
+        const response = await this.fetchImpl(this.sessionTicketEndpoint.toString(), {
           method: "POST",
           headers: {
             Accept: "application/json",

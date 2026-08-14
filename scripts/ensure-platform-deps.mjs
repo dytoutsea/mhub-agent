@@ -1,29 +1,20 @@
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
 const rollupPackage = JSON.parse(readFileSync(require.resolve("rollup/package.json"), "utf8"));
 const nativePackage = resolveRollupNativePackage(process.platform, process.arch);
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-const temporaryDirectory = mkdtempSync(path.join(tmpdir(), "mhub-rollup-native-"));
 const packagePath = path.join(...nativePackage.split("/"));
-const temporaryPackageDirectory = path.join(temporaryDirectory, "node_modules", packagePath);
 const localPackageDirectory = path.join(process.cwd(), "node_modules", packagePath);
 
-try {
-  writeFileSync(
-    path.join(temporaryDirectory, "package.json"),
-    JSON.stringify({ private: true, version: "0.0.0" }),
-  );
+if (!existsSync(path.join(localPackageDirectory, "package.json"))) {
   execFileSync(
     npmCommand,
     [
       "install",
-      "--prefix",
-      temporaryDirectory,
       "--ignore-scripts",
       "--no-save",
       "--package-lock=false",
@@ -33,10 +24,6 @@ try {
     ],
     { stdio: "inherit" },
   );
-  mkdirSync(path.dirname(localPackageDirectory), { recursive: true });
-  cpSync(temporaryPackageDirectory, localPackageDirectory, { recursive: true });
-} finally {
-  rmSync(temporaryDirectory, { recursive: true, force: true });
 }
 
 function resolveRollupNativePackage(platform, arch) {

@@ -22,7 +22,7 @@ if (!existsSync(path.join(localPackageDirectory, "package.json"))) {
       "--no-fund",
       `${nativePackage}@${rollupPackage.version}`,
     ],
-    { stdio: "inherit" },
+    { stdio: "inherit", shell: process.platform === "win32" },
   );
 }
 

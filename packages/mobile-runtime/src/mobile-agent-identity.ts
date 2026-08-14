@@ -34,11 +34,13 @@ export interface MobileAgentIdentityOptions {
   readonly platform: "android" | "ios";
   readonly store: MobileSecretStore;
   readonly crypto: MobileDeviceCrypto;
-  readonly fetchImpl?: typeof fetch;
+  readonly fetchImpl?: FetchLike;
   readonly now?: () => number;
   readonly deviceModel?: string;
   readonly osVersion?: string;
 }
+
+type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 interface StoredIdentity extends MobileAgentRegistration {
   readonly activationApiUrl: string;
@@ -52,7 +54,7 @@ export class MobileAgentIdentityManager {
   private readonly activationEndpoint: URL;
   private readonly sessionTicketEndpoint: URL;
   private readonly controlUrl: string;
-  private readonly fetchImpl: typeof fetch;
+  private readonly fetchImpl: FetchLike;
   private readonly now: () => number;
 
   constructor(private readonly options: MobileAgentIdentityOptions) {

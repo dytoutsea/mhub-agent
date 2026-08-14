@@ -21,6 +21,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run ensure:platform-deps
       - run: npm run verify
 
   ios-native:
@@ -33,4 +34,5 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run ensure:platform-deps
       - run: npm run mobile:ios:native:test

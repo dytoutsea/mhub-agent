@@ -28,13 +28,14 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run ensure:platform-deps
       - name: Validate Expo config
         run: |
           npm exec --workspace @mhub/mobile -- expo config --type public --json > /tmp/mhub-expo-config.json
           node -e "const c=require('/tmp/mhub-expo-config.json'); if(c.icon !== './assets/mhub-agent.png' || c.android.versionCode !== 1 || c.ios.buildNumber !== '1') throw new Error('Expo metadata mismatch')"
           node -e "JSON.parse(require('fs').readFileSync('apps/mobile/eas.json', 'utf8')); JSON.parse(require('fs').readFileSync('apps/mobile/app.json', 'utf8'))"
       - name: Export unsigned mobile bundle
-        run: npm run build --workspace @mhub/mobile
+        run: npm run build:mobile
 
   android-unsigned:
     name: Android unsigned APK
@@ -52,8 +53,10 @@ jobs:
           java-version: "17"
           cache: gradle
       - run: npm ci
+      - run: npm run ensure:platform-deps
       - name: Generate Android project
         run: |
+          npm run build:mobile
           npm exec --workspace @mhub/mobile -- expo prebuild --clean --no-install
           node scripts/check-mobile-native-boundary.mjs
       - name: Build unsigned APK
@@ -68,7 +71,7 @@ jobs:
             exit 1
           fi
           chmod +x apps/mobile/android/gradlew
-          apps/mobile/android/gradlew --no-daemon --stacktrace assembleRelease
+          (cd apps/mobile/android && ./gradlew --no-daemon --stacktrace assembleRelease)
           mkdir -p apps/mobile/release
           test -f apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
           cp apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk \
@@ -92,11 +95,13 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run ensure:platform-deps
       - name: Generate iOS project and install pods
         run: |
+          npm run build:mobile
           npm exec --workspace @mhub/mobile -- expo prebuild --clean --no-install
           node scripts/check-mobile-native-boundary.mjs
-          pod install --project-directory=apps/mobile/ios
+          (cd apps/mobile/ios && pod install)
       - name: Build unsigned simulator app
         shell: bash
         run: |

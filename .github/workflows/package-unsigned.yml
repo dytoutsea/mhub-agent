@@ -19,12 +19,17 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest]
     steps:
+      - name: Configure LF checkout on Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run ensure:platform-deps
       - name: Verify shared and desktop source
         shell: bash
         run: |
@@ -34,7 +39,7 @@ jobs:
           npm run mobile:native:check
           npm run expo:check
       - name: Export Expo Web renderer
-        run: npm run build --workspace @mhub/mobile
+        run: npm run build:mobile
       - name: Build unsigned installer
         run: npm run package:unsigned --workspace @mhub/desktop
         env:

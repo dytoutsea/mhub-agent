@@ -16,6 +16,7 @@
     "dev:mobile": "npm run start --workspace @mhub/mobile",
     "dev:web": "npm run web --workspace @mhub/mobile",
     "dev:desktop": "npm run dev --workspace @mhub/desktop",
+    "package:unsigned": "npm run build --workspace @mhub/mobile && npm run package:unsigned --workspace @mhub/desktop",
     "expo:check": "npm exec --workspace @mhub/mobile -- expo install --check",
     "mobile:native:check": "npm exec --workspace @mhub/mobile -- expo prebuild --clean --no-install && node scripts/check-mobile-native-boundary.mjs",
     "mobile:ios:native:test": "sh scripts/run-ios-native-tests.sh",

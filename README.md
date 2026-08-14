@@ -83,6 +83,18 @@ npm run dev:desktop
 
 完整验证包含 Biome、严格类型检查、单元测试、Expo 依赖兼容检查、Web 导出和 Electron 编译。
 
+### 平台打包（当前为 unsigned preview）
+
+桌面端先导出 Expo Web Renderer，再由 Electron Builder 生成 Windows NSIS 和 macOS DMG/ZIP：
+
+```bash
+npm run package:unsigned
+```
+
+产物位于 `apps/desktop/release/`，只用于内部预览或开发环境验收。当前构建明确关闭证书自动发现，不配置 `CSC_LINK`、`CSC_KEY_PASSWORD`、Apple Developer 证书或 notarization，因此不能宣称通过 Windows SmartScreen 或 macOS Gatekeeper。`MHUB_UPDATE_FEED_URL` 仅在已打包应用中启用，且必须为 HTTPS；更新检查、下载和安装均由 Electron Main/托盘发起，Renderer 不直接访问更新服务。
+
+移动端的 `apps/mobile/eas.json` 已定义 development、preview（Android APK）和 production（Android AAB）配置。`Mobile CI` 在 `dev` 推送、手动触发或移动端相关 Pull Request 时运行：除了校验 Expo/EAS 配置，还会上传 unsigned Android APK 和 unsigned iOS Simulator `.app` 压缩包，Artifact 保留 14 天。EAS credentials、Android/iOS 真机签名和商店上传属于后续发布阶段，本轮不执行；iOS CI 产物只能安装到模拟器，不能安装到真机。
+
 ### Electron Agent Runtime 开发配置
 
 Electron Main Process 持有 Relay Agent 生命周期，Renderer 只通过版本化 IPC 获取快照、激活、启动/停止和接收脱敏状态事件。桌面 Renderer 已支持激活码输入、代理 ID 复制、状态与活动连接展示、启停控制，以及最多 100 条脱敏状态事件。关闭窗口后 Agent 继续由系统托盘托管；正式配置分发、品牌托盘图标和安装包平台验收仍待完成。

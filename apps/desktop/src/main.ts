@@ -23,8 +23,10 @@ import {
   agentSnapshotSchema,
   desktopChannels,
   hostInfoSchema,
+  updateSnapshotSchema,
 } from "./contracts";
 import { FileDesktopPreferencesStore } from "./desktop-preferences";
+import { DesktopUpdater } from "./desktop-updater";
 import { resolveRendererPath } from "./renderer-path";
 import { SafeStorageSecretStore } from "./secure-store";
 import { DesktopSystemLifecycle } from "./system-lifecycle";
@@ -34,6 +36,7 @@ let agentRuntime: DesktopAgentRuntime | null = null;
 let activationManager: ActivationManager | null = null;
 let tray: Tray | null = null;
 let systemLifecycle: DesktopSystemLifecycle | null = null;
+let desktopUpdater: DesktopUpdater | null = null;
 let quitting = false;
 
 protocol.registerSchemesAsPrivileged([
@@ -89,6 +92,27 @@ function registerIpcHandlers() {
     await systemLifecycle?.activated();
     return activationResultSchema.parse(activated.result);
   });
+  ipcMain.handle(desktopChannels.updateGetState, () =>
+    updateSnapshotSchema.parse(desktopUpdater?.getSnapshot()),
+  );
+  ipcMain.handle(desktopChannels.updateCheck, async () => {
+    if (!desktopUpdater) {
+      throw new Error("UPDATE_UNSUPPORTED");
+    }
+    return updateSnapshotSchema.parse(await desktopUpdater.check());
+  });
+  ipcMain.handle(desktopChannels.updateDownload, async () => {
+    if (!desktopUpdater) {
+      throw new Error("UPDATE_UNSUPPORTED");
+    }
+    return updateSnapshotSchema.parse(await desktopUpdater.download());
+  });
+  ipcMain.handle(desktopChannels.updateInstall, () => {
+    if (!desktopUpdater) {
+      throw new Error("UPDATE_UNSUPPORTED");
+    }
+    return updateSnapshotSchema.parse(desktopUpdater.install());
+  });
 }
 
 function broadcastAgentState(snapshot: ReturnType<DesktopAgentRuntime["getSnapshot"]>) {
@@ -97,6 +121,13 @@ function broadcastAgentState(snapshot: ReturnType<DesktopAgentRuntime["getSnapsh
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(desktopChannels.agentStateChanged, event);
   }
+}
+
+function broadcastUpdateState(snapshot: ReturnType<DesktopUpdater["getSnapshot"]>) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(desktopChannels.updateStateChanged, { snapshot });
+  }
+  updateTrayMenu();
 }
 
 function updateTrayMenu() {
@@ -110,11 +141,33 @@ function updateTrayMenu() {
     snapshot.state === "connecting" ||
     snapshot.state === "backoff" ||
     snapshot.state === "paused";
+  const updateSnapshot = desktopUpdater?.getSnapshot();
+  const updateAction =
+    updateSnapshot?.state === "available"
+      ? {
+          label: `下载更新 ${updateSnapshot.availableVersion ?? ""}`.trim(),
+          action: () => void desktopUpdater?.download().catch(() => undefined),
+        }
+      : updateSnapshot?.state === "downloaded"
+        ? { label: "安装已下载更新", action: () => desktopUpdater?.install() }
+        : { label: "检查更新", action: () => void desktopUpdater?.check().catch(() => undefined) };
   tray.setContextMenu(
     Menu.buildFromTemplate([
       {
         label: "显示 MHub Agent",
         click: () => showMainWindow(),
+      },
+      { type: "separator" },
+      {
+        label:
+          updateSnapshot?.state === "downloading" || updateSnapshot?.state === "checking"
+            ? "正在检查更新..."
+            : updateAction.label,
+        enabled:
+          Boolean(desktopUpdater) &&
+          updateSnapshot?.state !== "downloading" &&
+          updateSnapshot?.state !== "checking",
+        click: updateAction.action,
       },
       { type: "separator" },
       {
@@ -156,7 +209,11 @@ function createTray() {
   if (tray) {
     return;
   }
-  tray = new Tray(nativeImage.createEmpty());
+  const trayIconPath = app.isPackaged
+    ? path.join(process.resourcesPath, "tray", "mhub-agent.png")
+    : path.join(app.getAppPath(), "assets", "mhub-agent.png");
+  const trayIcon = nativeImage.createFromPath(trayIconPath);
+  tray = new Tray(trayIcon.isEmpty() ? nativeImage.createEmpty() : trayIcon);
   tray.setToolTip("MHub Agent");
   tray.on("click", showMainWindow);
   updateTrayMenu();
@@ -314,6 +371,12 @@ if (!ownsSingleInstanceLock) {
       agentRuntime = new DesktopAgentRuntime(hostPlatform());
     }
     agentRuntime.subscribe(broadcastAgentState);
+    desktopUpdater = new DesktopUpdater({
+      enabled: app.isPackaged,
+      currentVersion: app.getVersion(),
+      ...(process.env.MHUB_UPDATE_FEED_URL ? { feedUrl: process.env.MHUB_UPDATE_FEED_URL } : {}),
+      onSnapshot: broadcastUpdateState,
+    });
     systemLifecycle = new DesktopSystemLifecycle({
       runtime: () => agentRuntime,
       preferences: new FileDesktopPreferencesStore(

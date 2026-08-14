@@ -54,6 +54,32 @@ export const activationResultSchema = z.object({
 export type ActivationRequest = z.infer<typeof activationRequestSchema>;
 export type ActivationResult = z.infer<typeof activationResultSchema>;
 
+export const updateStateSchema = z.enum([
+  "idle",
+  "checking",
+  "available",
+  "downloading",
+  "downloaded",
+  "not-available",
+  "error",
+]);
+
+export const updateSnapshotSchema = z.object({
+  state: updateStateSchema,
+  currentVersion: z.string().min(1).max(32),
+  availableVersion: z.string().max(32).nullable(),
+  downloadPercent: z.number().min(0).max(100).nullable(),
+  errorCode: z
+    .string()
+    .regex(/^[A-Z0-9_]+$/)
+    .max(96)
+    .nullable(),
+});
+
+export type UpdateSnapshot = z.infer<typeof updateSnapshotSchema>;
+
+export const updateEventSchema = z.object({ snapshot: updateSnapshotSchema });
+
 export const desktopChannels = Object.freeze({
   getHostInfo: "host:get-info",
   agentGetState: "agent:get-state",
@@ -61,4 +87,9 @@ export const desktopChannels = Object.freeze({
   agentStop: "agent:stop",
   agentStateChanged: "agent:state-changed",
   agentActivate: "agent:activate",
+  updateGetState: "update:get-state",
+  updateCheck: "update:check",
+  updateDownload: "update:download",
+  updateInstall: "update:install",
+  updateStateChanged: "update:state-changed",
 });

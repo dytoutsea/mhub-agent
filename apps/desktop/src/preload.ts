@@ -7,6 +7,8 @@ import {
   agentSnapshotSchema,
   desktopChannels,
   hostInfoSchema,
+  updateEventSchema,
+  updateSnapshotSchema,
 } from "./contracts";
 
 const desktopApi = Object.freeze({
@@ -34,6 +36,25 @@ const desktopApi = Object.freeze({
       };
       ipcRenderer.on(desktopChannels.agentStateChanged, handler);
       return () => ipcRenderer.removeListener(desktopChannels.agentStateChanged, handler);
+    },
+  }),
+  updates: Object.freeze({
+    getState: async () =>
+      updateSnapshotSchema.parse(await ipcRenderer.invoke(desktopChannels.updateGetState)),
+    check: async () =>
+      updateSnapshotSchema.parse(await ipcRenderer.invoke(desktopChannels.updateCheck)),
+    download: async () =>
+      updateSnapshotSchema.parse(await ipcRenderer.invoke(desktopChannels.updateDownload)),
+    install: async () =>
+      updateSnapshotSchema.parse(await ipcRenderer.invoke(desktopChannels.updateInstall)),
+    onStateChanged: (
+      listener: (snapshot: ReturnType<typeof updateEventSchema.parse>["snapshot"]) => void,
+    ) => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: unknown) => {
+        listener(updateEventSchema.parse(payload).snapshot);
+      };
+      ipcRenderer.on(desktopChannels.updateStateChanged, handler);
+      return () => ipcRenderer.removeListener(desktopChannels.updateStateChanged, handler);
     },
   }),
 });

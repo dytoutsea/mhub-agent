@@ -3,6 +3,7 @@
     "name": "MHub Agent",
     "slug": "mhub-agent",
     "version": "0.1.0",
+    "icon": "./assets/mhub-agent.png",
     "orientation": "portrait",
     "plugins": [
       "@mhub/mobile-data-tunnel",
@@ -11,10 +12,12 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.mhub.agent",
+      "buildNumber": "1",
       "supportsTablet": true
     },
     "android": {
       "package": "com.mhub.agent",
+      "versionCode": 1,
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",

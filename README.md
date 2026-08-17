@@ -100,7 +100,9 @@ npm run package:unsigned:mac:universal --workspace @mhub/desktop
 
 产物位于 `apps/desktop/release/`，只用于内部预览或开发环境验收。当前构建明确关闭证书自动发现，不配置 `CSC_LINK`、`CSC_KEY_PASSWORD`、Apple Developer 证书或 notarization，因此不能宣称通过 Windows SmartScreen 或 macOS Gatekeeper。Universal 仅解决 CPU 架构兼容，不替代签名或公证。`MHUB_UPDATE_FEED_URL` 仅在已打包应用中启用，且必须为 HTTPS；更新检查、下载和安装均由 Electron Main/托盘发起，Renderer 不直接访问更新服务。
 
-移动端的 `apps/mobile/eas.json` 已定义 development、preview（Android APK）和 production（Android AAB）配置。`Mobile CI` 在 `dev` 推送、手动触发或移动端相关 Pull Request 时运行：除了校验 Expo/EAS 配置，还会上传 unsigned Android APK 和 unsigned iOS Simulator `.app` 压缩包，Artifact 保留 14 天。EAS credentials、Android/iOS 真机签名和商店上传属于后续发布阶段，本轮不执行；iOS CI 产物只能安装到模拟器，不能安装到真机。
+移动端的 `apps/mobile/eas.json` 已定义 development、preview（Android APK）和 production（Android AAB）配置。`Mobile CI` 在 `dev` 推送、手动触发或移动端相关 Pull Request 时运行：`dev` 推送和手动运行使用 GitHub Actions Secrets 中的 Android keystore、密码及 alias 生成 `mhub-agent-android-signed` 安装包；Pull Request 不接触签名 Secret，只上传 unsigned 编译验证包。iOS 仍上传 unsigned Simulator `.app` 压缩包，只能安装到模拟器，不能安装到真机。Artifact 保留 14 天。
+
+Android CI 签名需要仓库 Secrets `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD`。keystore 只在 Runner 临时目录恢复，签名后立即删除；签名文件和密码不得写入仓库、日志或 Expo 公共配置。EAS credentials、iOS 真机签名和商店上传仍属于后续发布阶段。
 
 ### Electron Agent Runtime 开发配置
 

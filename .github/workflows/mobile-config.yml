@@ -13,6 +13,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - ".nvmrc"
+      - ".github/workflows/mobile-config.yml"
 
 permissions:
   contents: read
@@ -37,8 +38,8 @@ jobs:
       - name: Export unsigned mobile bundle
         run: npm run build:mobile
 
-  android-unsigned:
-    name: Android unsigned APK
+  android-apk:
+    name: Android APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -72,15 +73,51 @@ jobs:
           fi
           chmod +x apps/mobile/android/gradlew
           (cd apps/mobile/android && ./gradlew --no-daemon --stacktrace assembleRelease)
-          mkdir -p apps/mobile/release
           test -f apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
+      - name: Sign Android APK
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Required Android signing secret is missing: $name"
+              exit 1
+            fi
+          done
+          keystore_path="$RUNNER_TEMP/mhub-agent-release.jks"
+          trap 'rm -f "$keystore_path"' EXIT
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+          chmod 600 "$keystore_path"
+          apksigner_path="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d -print | sort -V | tail -n 1)/apksigner"
+          test -x "$apksigner_path"
+          mkdir -p apps/mobile/release
+          "$apksigner_path" sign \
+            --ks "$keystore_path" \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
+            --key-pass env:ANDROID_KEY_PASSWORD \
+            --out apps/mobile/release/mhub-agent-android-signed.apk \
+            apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          "$apksigner_path" verify apps/mobile/release/mhub-agent-android-signed.apk
+      - name: Stage unsigned Pull Request APK
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p apps/mobile/release
           cp apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk \
             apps/mobile/release/mhub-agent-android-unsigned.apk
-      - name: Upload unsigned APK
+      - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
-          name: mhub-agent-android-unsigned
-          path: apps/mobile/release/mhub-agent-android-unsigned.apk
+          name: ${{ github.event_name == 'pull_request' && 'mhub-agent-android-unsigned' || 'mhub-agent-android-signed' }}
+          path: apps/mobile/release/*.apk
           if-no-files-found: error
           retention-days: 14
 

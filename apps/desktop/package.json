@@ -51,8 +51,7 @@
       "category": "public.app-category.utilities",
       "hardenedRuntime": true,
       "target": [
-        "dmg",
-        "zip"
+        "dmg"
       ]
     },
     "win": {

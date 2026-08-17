@@ -85,7 +85,7 @@ npm run dev:desktop
 
 ### 平台打包（当前为 unsigned preview）
 
-桌面端先导出 Expo Web Renderer，再由 Electron Builder 生成 Windows NSIS 和 macOS DMG/ZIP：
+桌面端先导出 Expo Web Renderer，再由 Electron Builder 生成 Windows NSIS `.exe` 和 macOS Universal `.dmg`：
 
 ```bash
 npm run package:unsigned
@@ -98,7 +98,7 @@ npm run build:mobile
 npm run package:unsigned:mac:universal --workspace @mhub/desktop
 ```
 
-产物位于 `apps/desktop/release/`，只用于内部预览或开发环境验收。当前构建明确关闭证书自动发现，不配置 `CSC_LINK`、`CSC_KEY_PASSWORD`、Apple Developer 证书或 notarization，因此不能宣称通过 Windows SmartScreen 或 macOS Gatekeeper。Universal 仅解决 CPU 架构兼容，不替代签名或公证。`MHUB_UPDATE_FEED_URL` 仅在已打包应用中启用，且必须为 HTTPS；更新检查、下载和安装均由 Electron Main/托盘发起，Renderer 不直接访问更新服务。
+产物位于 `apps/desktop/release/`，只用于内部预览或开发环境验收。GitHub Actions 按平台仅上传 Windows `.exe` 或 macOS `.dmg`，不上传解包目录、macOS ZIP、blockmap 或更新元数据。当前构建明确关闭证书自动发现，不配置 `CSC_LINK`、`CSC_KEY_PASSWORD`、Apple Developer 证书或 notarization，因此不能宣称通过 Windows SmartScreen 或 macOS Gatekeeper。Universal 仅解决 CPU 架构兼容，不替代签名或公证。`MHUB_UPDATE_FEED_URL` 仅在已打包应用中启用，且必须为 HTTPS；更新检查、下载和安装均由 Electron Main/托盘发起，Renderer 不直接访问更新服务。
 
 移动端的 `apps/mobile/eas.json` 已定义 development、preview（Android APK）和 production（Android AAB）配置。`Mobile CI` 在 `dev` 推送、手动触发或移动端相关 Pull Request 时运行：`dev` 推送和手动运行使用 GitHub Actions Secrets 中的 Android keystore、密码及 alias 生成 `mhub-agent-android-signed` 安装包；Pull Request 不接触签名 Secret，只上传 unsigned 编译验证包。iOS 仍上传 unsigned Simulator `.app` 压缩包，只能安装到模拟器，不能安装到真机。Artifact 保留 14 天。
 

@@ -54,10 +54,19 @@ jobs:
         run: npm run package:unsigned:mac:universal --workspace @mhub/desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-      - name: Upload unsigned artifact
+      - name: Upload unsigned Windows executable
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: mhub-agent-${{ matrix.os }}-unsigned
-          path: apps/desktop/release/*
+          name: mhub-agent-windows-latest-unsigned
+          path: apps/desktop/release/*.exe
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload unsigned macOS disk image
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mhub-agent-macos-latest-unsigned
+          path: apps/desktop/release/*.dmg
           if-no-files-found: error
           retention-days: 14

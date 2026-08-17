@@ -44,8 +44,14 @@ jobs:
           npm run expo:check
       - name: Export Expo Web renderer
         run: npm run build:mobile
-      - name: Build unsigned installer
+      - name: Build unsigned Windows installer
+        if: runner.os == 'Windows'
         run: npm run package:unsigned --workspace @mhub/desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Build unsigned macOS Universal installer
+        if: runner.os == 'macOS'
+        run: npm run package:unsigned:mac:universal --workspace @mhub/desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
       - name: Upload unsigned artifact

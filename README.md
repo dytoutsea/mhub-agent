@@ -91,7 +91,14 @@ npm run dev:desktop
 npm run package:unsigned
 ```
 
-产物位于 `apps/desktop/release/`，只用于内部预览或开发环境验收。当前构建明确关闭证书自动发现，不配置 `CSC_LINK`、`CSC_KEY_PASSWORD`、Apple Developer 证书或 notarization，因此不能宣称通过 Windows SmartScreen 或 macOS Gatekeeper。`MHUB_UPDATE_FEED_URL` 仅在已打包应用中启用，且必须为 HTTPS；更新检查、下载和安装均由 Electron Main/托盘发起，Renderer 不直接访问更新服务。
+GitHub Actions 的 macOS job 使用 Universal 架构打包，同时包含 `x86_64` 与 `arm64`，可在 Intel Mac 和 Apple Silicon Mac 上运行。需要在 macOS 本机生成相同产物时执行：
+
+```bash
+npm run build:mobile
+npm run package:unsigned:mac:universal --workspace @mhub/desktop
+```
+
+产物位于 `apps/desktop/release/`，只用于内部预览或开发环境验收。当前构建明确关闭证书自动发现，不配置 `CSC_LINK`、`CSC_KEY_PASSWORD`、Apple Developer 证书或 notarization，因此不能宣称通过 Windows SmartScreen 或 macOS Gatekeeper。Universal 仅解决 CPU 架构兼容，不替代签名或公证。`MHUB_UPDATE_FEED_URL` 仅在已打包应用中启用，且必须为 HTTPS；更新检查、下载和安装均由 Electron Main/托盘发起，Renderer 不直接访问更新服务。
 
 移动端的 `apps/mobile/eas.json` 已定义 development、preview（Android APK）和 production（Android AAB）配置。`Mobile CI` 在 `dev` 推送、手动触发或移动端相关 Pull Request 时运行：除了校验 Expo/EAS 配置，还会上传 unsigned Android APK 和 unsigned iOS Simulator `.app` 压缩包，Artifact 保留 14 天。EAS credentials、Android/iOS 真机签名和商店上传属于后续发布阶段，本轮不执行；iOS CI 产物只能安装到模拟器，不能安装到真机。
 

@@ -26,6 +26,7 @@ import {
   updateSnapshotSchema,
 } from "./contracts";
 import { FileDesktopPreferencesStore } from "./desktop-preferences";
+import { prepareTrayIcon, revealDesktopWindow } from "./desktop-shell";
 import { DesktopUpdater } from "./desktop-updater";
 import { resolveRendererPath } from "./renderer-path";
 import { SafeStorageSecretStore } from "./secure-store";
@@ -38,6 +39,7 @@ let tray: Tray | null = null;
 let systemLifecycle: DesktopSystemLifecycle | null = null;
 let desktopUpdater: DesktopUpdater | null = null;
 let quitting = false;
+let desktopReady = false;
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -194,26 +196,31 @@ function updateTrayMenu() {
 }
 
 function showMainWindow() {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    void createMainWindow();
-    return;
-  }
-  if (mainWindow.isMinimized()) {
-    mainWindow.restore();
-  }
-  mainWindow.show();
-  mainWindow.focus();
+  revealDesktopWindow(mainWindow, () => void createMainWindow());
 }
 
-function createTray() {
+async function createTray() {
   if (tray) {
     return;
   }
   const trayIconPath = app.isPackaged
     ? path.join(process.resourcesPath, "tray", "mhub-agent.png")
     : path.join(app.getAppPath(), "assets", "mhub-agent.png");
-  const trayIcon = nativeImage.createFromPath(trayIconPath);
-  tray = new Tray(trayIcon.isEmpty() ? nativeImage.createEmpty() : trayIcon);
+  let trayIcon = prepareTrayIcon(nativeImage.createFromPath(trayIconPath), process.platform);
+  if (!trayIcon) {
+    try {
+      trayIcon = prepareTrayIcon(
+        await app.getFileIcon(process.execPath, { size: "small" }),
+        process.platform,
+      );
+    } catch {
+      trayIcon = null;
+    }
+  }
+  if (!trayIcon) {
+    return;
+  }
+  tray = new Tray(trayIcon);
   tray.setToolTip("黄雀云Agent");
   tray.on("click", showMainWindow);
   updateTrayMenu();
@@ -313,7 +320,7 @@ async function createMainWindow() {
 
   window.once("ready-to-show", () => window.show());
   window.on("close", (event) => {
-    if (!quitting) {
+    if (!quitting && tray) {
       event.preventDefault();
       window.hide();
     }
@@ -340,11 +347,8 @@ if (!ownsSingleInstanceLock) {
   app.quit();
 } else {
   app.on("second-instance", () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) {
-        mainWindow.restore();
-      }
-      mainWindow.focus();
+    if (desktopReady) {
+      showMainWindow();
     }
   });
 
@@ -388,20 +392,21 @@ if (!ownsSingleInstanceLock) {
     registerIpcHandlers();
     registerRendererProtocol();
     enforceProductionContentSecurityPolicy();
-    createTray();
+    await createTray();
     registerSystemLifecycleEvents();
     await systemLifecycle.initialize().catch(() => undefined);
     await createMainWindow();
+    desktopReady = true;
 
     app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
-        void createMainWindow();
-      }
+      showMainWindow();
     });
   });
 
   app.on("window-all-closed", () => {
-    // The tray owns the desktop lifecycle; closing the window must not stop the agent.
+    if (!tray) {
+      app.quit();
+    }
   });
 
   app.on("before-quit", () => {

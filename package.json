@@ -14,6 +14,7 @@
     "build:mobile": "npm run build --workspace @mhub/shared && npm run build --workspace @mhub/relay-protocol && npm run build --workspace @mhub/mobile-runtime && npm run build --workspace @mhub/mobile",
     "check": "biome check .",
     "check:write": "biome check --write .",
+    "client:config:check": "node scripts/check-client-build-configuration.mjs",
     "dev:mobile": "npm run start --workspace @mhub/mobile",
     "dev:web": "npm run web --workspace @mhub/mobile",
     "dev:desktop": "npm run dev --workspace @mhub/desktop",

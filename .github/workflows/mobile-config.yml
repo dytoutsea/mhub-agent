@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - dev
+      - main
   pull_request:
     paths:
       - "apps/mobile/**"
@@ -14,6 +15,14 @@ on:
       - "package-lock.json"
       - ".nvmrc"
       - ".github/workflows/mobile-config.yml"
+
+env:
+  MHUB_RELEASE_CHANNEL: ${{ (github.ref_name == 'main' || github.base_ref == 'main') && 'main' || 'dev' }}
+  MHUB_AGENT_ACTIVATION_API_URL: ${{ (github.ref_name == 'main' || github.base_ref == 'main') && vars.MHUB_PROD_AGENT_ACTIVATION_API_URL || vars.MHUB_DEV_AGENT_ACTIVATION_API_URL }}
+  MHUB_RELAY_CONTROL_URL: ${{ (github.ref_name == 'main' || github.base_ref == 'main') && vars.MHUB_PROD_RELAY_CONTROL_URL || vars.MHUB_DEV_RELAY_CONTROL_URL }}
+  EXPO_PUBLIC_MHUB_RELEASE_CHANNEL: ${{ (github.ref_name == 'main' || github.base_ref == 'main') && 'main' || 'dev' }}
+  EXPO_PUBLIC_MHUB_AGENT_ACTIVATION_API_URL: ${{ (github.ref_name == 'main' || github.base_ref == 'main') && vars.MHUB_PROD_AGENT_ACTIVATION_API_URL || vars.MHUB_DEV_AGENT_ACTIVATION_API_URL }}
+  EXPO_PUBLIC_MHUB_RELAY_CONTROL_URL: ${{ (github.ref_name == 'main' || github.base_ref == 'main') && vars.MHUB_PROD_RELAY_CONTROL_URL || vars.MHUB_DEV_RELAY_CONTROL_URL }}
 
 permissions:
   contents: read
@@ -30,6 +39,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run ensure:platform-deps
+      - run: npm run client:config:check
       - name: Validate Expo config
         run: |
           npm exec --workspace @mhub/mobile -- expo config --type public --json > /tmp/mhub-expo-config.json
@@ -55,6 +65,7 @@ jobs:
           cache: gradle
       - run: npm ci
       - run: npm run ensure:platform-deps
+      - run: npm run client:config:check
       - name: Generate Android project
         run: |
           npm run build:mobile
@@ -133,6 +144,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run ensure:platform-deps
+      - run: npm run client:config:check
       - name: Generate iOS project and install pods
         run: |
           npm run build:mobile

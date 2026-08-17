@@ -62,7 +62,7 @@ MHUB_RELAY_JAR=/absolute/path/to/mhub-relay.jar npm run test:relay-e2e
 npm run dev:mobile
 ```
 
-Android/iOS 激活与代理运行需要公开构建配置 `EXPO_PUBLIC_MHUB_AGENT_ACTIVATION_API_URL` 和 `EXPO_PUBLIC_MHUB_RELAY_CONTROL_URL`。前者必须是 `/agent-api/v1/activations:exchange` HTTPS 端点，后者必须是 `/agent/v1/control` WSS 端点。`EXPO_PUBLIC_*` 会进入客户端包，只能放公开地址，不能放激活码、credential、ticket、私钥或内部代理 URI。
+Android/iOS 激活与代理运行需要公开构建配置 `EXPO_PUBLIC_MHUB_AGENT_ACTIVATION_API_URL`、`EXPO_PUBLIC_MHUB_RELAY_CONTROL_URL` 和 `EXPO_PUBLIC_MHUB_RELEASE_CHANNEL`。正式通道前者必须是 `/agent-api/v1/activations:exchange` HTTPS 端点，后者必须是 `/agent/v1/control` WSS 端点；`dev` 通道可使用明确配置的开发服 HTTP/WS。`EXPO_PUBLIC_*` 会进入客户端包，只能放公开地址和通道名，不能放激活码、credential、ticket、私钥或内部代理 URI。
 
 移动端激活时生成 Ed25519 设备密钥，使用 Expo SecureStore 保存到 Android Keystore/iOS Keychain 保护的本机存储；每次控制 WSS 重连重新签名获取短期 ticket。当前不支持 Expo Go，需使用 Prebuild 后的开发客户端或原生构建。
 
@@ -98,7 +98,7 @@ npm run build:mobile
 npm run package:unsigned:mac:universal --workspace @mhub/desktop
 ```
 
-产物位于 `apps/desktop/release/`，只用于内部预览或开发环境验收。GitHub Actions 按平台仅上传 Windows `.exe` 或 macOS `.dmg`，不上传解包目录、macOS ZIP、blockmap 或更新元数据。当前构建明确关闭证书自动发现，不配置 `CSC_LINK`、`CSC_KEY_PASSWORD`、Apple Developer 证书或 notarization，因此不能宣称通过 Windows SmartScreen 或 macOS Gatekeeper。Universal 仅解决 CPU 架构兼容，不替代签名或公证。`MHUB_UPDATE_FEED_URL` 仅在已打包应用中启用，且必须为 HTTPS；更新检查、下载和安装均由 Electron Main/托盘发起，Renderer 不直接访问更新服务。
+产物位于 `apps/desktop/release/`，只用于内部预览或开发环境验收。GitHub Actions 按平台仅上传 Windows `.exe` 或 macOS `.dmg`，不上传解包目录、macOS ZIP、blockmap 或更新元数据。`dev` 构建从 Repository Variables `MHUB_DEV_AGENT_ACTIVATION_API_URL` 和 `MHUB_DEV_RELAY_CONTROL_URL` 内置开发服地址，`main` 构建使用对应的 `MHUB_PROD_*` Variables 内置生产地址；配置缺失或正式地址不是 HTTPS/WSS 时构建直接失败。地址是公开构建信息，不得在这些 Variables 中放入凭据。当前构建明确关闭证书自动发现，不配置 `CSC_LINK`、`CSC_KEY_PASSWORD`、Apple Developer 证书或 notarization，因此不能宣称通过 Windows SmartScreen 或 macOS Gatekeeper。Universal 仅解决 CPU 架构兼容，不替代签名或公证。`MHUB_UPDATE_FEED_URL` 仅在已打包应用中启用，且必须为 HTTPS；更新检查、下载和安装均由 Electron Main/托盘发起，Renderer 不直接访问更新服务。
 
 移动端的 `apps/mobile/eas.json` 已定义 development、preview（Android APK）和 production（Android AAB）配置。`Mobile CI` 在 `dev` 推送、手动触发或移动端相关 Pull Request 时运行：`dev` 推送和手动运行使用 GitHub Actions Secrets 中的 Android keystore、密码及 alias 生成 `mhub-agent-android-signed` 安装包；Pull Request 不接触签名 Secret，只上传 unsigned 编译验证包。iOS 仍上传 unsigned Simulator `.app` 压缩包，只能安装到模拟器，不能安装到真机。Artifact 保留 14 天。
 

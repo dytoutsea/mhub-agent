@@ -15,6 +15,43 @@ describe("mobile public configuration", () => {
     });
   });
 
+  it("accepts the controlled insecure development endpoints only in the dev channel", () => {
+    expect(
+      parseMobilePublicConfiguration(
+        "http://8.138.121.25:8080/agent-api/v1/activations:exchange",
+        "ws://8.138.121.25:8443/agent/v1/control",
+        "dev",
+      ),
+    ).toEqual({
+      activationApiUrl: "http://8.138.121.25:8080/agent-api/v1/activations:exchange",
+      controlUrl: "ws://8.138.121.25:8443/agent/v1/control",
+    });
+    expect(
+      parseMobilePublicConfiguration(
+        "http://8.138.121.25:8080/agent-api/v1/activations:exchange",
+        "ws://8.138.121.25:8443/agent/v1/control",
+        "main",
+      ),
+    ).toBeNull();
+  });
+
+  it("rejects unsupported release channels and endpoint credentials", () => {
+    expect(
+      parseMobilePublicConfiguration(
+        "https://api.example/agent-api/v1/activations:exchange",
+        "wss://relay.example/agent/v1/control",
+        "preview",
+      ),
+    ).toBeNull();
+    expect(
+      parseMobilePublicConfiguration(
+        "https://user:pass@api.example/agent-api/v1/activations:exchange",
+        "wss://relay.example/agent/v1/control",
+        "main",
+      ),
+    ).toBeNull();
+  });
+
   it.each([
     [undefined, "wss://relay.example/agent/v1/control"],
     ["not-a-url", "wss://relay.example/agent/v1/control"],

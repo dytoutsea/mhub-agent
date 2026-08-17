@@ -154,7 +154,7 @@ function updateTrayMenu() {
   tray.setContextMenu(
     Menu.buildFromTemplate([
       {
-        label: "显示 MHub Agent",
+        label: "显示黄雀云Agent",
         click: () => showMainWindow(),
       },
       { type: "separator" },
@@ -214,7 +214,7 @@ function createTray() {
     : path.join(app.getAppPath(), "assets", "mhub-agent.png");
   const trayIcon = nativeImage.createFromPath(trayIconPath);
   tray = new Tray(trayIcon.isEmpty() ? nativeImage.createEmpty() : trayIcon);
-  tray.setToolTip("MHub Agent");
+  tray.setToolTip("黄雀云Agent");
   tray.on("click", showMainWindow);
   updateTrayMenu();
 }
@@ -284,7 +284,7 @@ async function createMainWindow() {
     minHeight: 600,
     minWidth: 760,
     show: false,
-    title: "MHub Agent",
+    title: "黄雀云Agent",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

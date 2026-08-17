@@ -32,7 +32,7 @@ jobs:
       - name: Validate Expo config
         run: |
           npm exec --workspace @mhub/mobile -- expo config --type public --json > /tmp/mhub-expo-config.json
-          node -e "const c=require('/tmp/mhub-expo-config.json'); if(c.icon !== './assets/mhub-agent.png' || c.android.versionCode !== 1 || c.ios.buildNumber !== '1') throw new Error('Expo metadata mismatch')"
+          node -e "const c=require('/tmp/mhub-expo-config.json'); if(c.name !== '黄雀云Agent' || c.icon !== './assets/mhub-agent.png' || c.android.versionCode !== 1 || c.ios.buildNumber !== '1') throw new Error('Expo metadata mismatch')"
           node -e "JSON.parse(require('fs').readFileSync('apps/mobile/eas.json', 'utf8')); JSON.parse(require('fs').readFileSync('apps/mobile/app.json', 'utf8'))"
       - name: Export unsigned mobile bundle
         run: npm run build:mobile
@@ -107,15 +107,15 @@ jobs:
         run: |
           set -euo pipefail
           xcodebuild \
-            -workspace apps/mobile/ios/MHubAgent.xcworkspace \
-            -scheme MHubAgent \
+            -workspace apps/mobile/ios/Agent.xcworkspace \
+            -scheme Agent \
             -configuration Release \
             -sdk iphonesimulator \
             -derivedDataPath "$RUNNER_TEMP/mhub-agent-ios-derived" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             build
-          app_path="$RUNNER_TEMP/mhub-agent-ios-derived/Build/Products/Release-iphonesimulator/MHubAgent.app"
+          app_path="$RUNNER_TEMP/mhub-agent-ios-derived/Build/Products/Release-iphonesimulator/Agent.app"
           test -d "$app_path"
           mkdir -p apps/mobile/release
           ditto -c -k --sequesterRsrc --keepParent "$app_path" \

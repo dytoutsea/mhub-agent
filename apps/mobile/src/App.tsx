@@ -236,7 +236,7 @@ function AppShell({
       <View style={styles.shell}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.productName}>MHub Agent</Text>
+            <Text style={styles.productName}>黄雀云Agent</Text>
             <Text style={styles.version}>v{version}</Text>
           </View>
           <View style={styles.headerState}>

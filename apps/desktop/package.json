@@ -26,7 +26,7 @@
   },
   "build": {
     "appId": "com.mhub.agent",
-    "productName": "MHub Agent",
+    "productName": "黄雀云Agent",
     "asar": true,
     "icon": "assets/mhub-agent.png",
     "artifactName": "mhub-agent-${version}-${os}-${arch}.${ext}",

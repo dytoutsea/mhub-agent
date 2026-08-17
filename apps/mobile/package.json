@@ -13,12 +13,12 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "@expo/metro-runtime": "~57.0.9",
+    "@expo/metro-runtime": "~57.0.10",
     "@mhub/mobile-data-tunnel": "*",
     "@mhub/mobile-runtime": "*",
     "@mhub/shared": "*",
     "@noble/curves": "2.3.0",
-    "expo": "~57.0.12",
+    "expo": "~57.0.13",
     "expo-clipboard": "57.0.1",
     "expo-crypto": "57.0.1",
     "expo-secure-store": "57.0.1",

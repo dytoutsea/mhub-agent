@@ -99,32 +99,40 @@ function MobileAgentApp({
   const [events, setEvents] = useState<readonly StatusEvent[]>([]);
   const eventId = useRef(0);
   const configuration = useMemo(mobilePublicConfiguration, []);
-  const controller = useMemo(() => {
+  const controllerSetup = useMemo(() => {
     if (!configuration) {
-      return null;
+      return { controller: null, errorCode: "CONFIGURATION_REQUIRED" } as const;
     }
-    return createMobileAgentController(configuration, (next) => {
-      setSnapshot(next);
-      setEvents((current) =>
-        [
-          {
-            id: ++eventId.current,
-            occurredAt: new Date().toISOString(),
-            state: next.state,
-            errorCode: next.errorCode,
-          },
-          ...current,
-        ].slice(0, 100),
-      );
-    });
+    try {
+      return {
+        controller: createMobileAgentController(configuration, (next) => {
+          setSnapshot(next);
+          setEvents((current) =>
+            [
+              {
+                id: ++eventId.current,
+                occurredAt: new Date().toISOString(),
+                state: next.state,
+                errorCode: next.errorCode,
+              },
+              ...current,
+            ].slice(0, 100),
+          );
+        }),
+        errorCode: null,
+      } as const;
+    } catch {
+      return { controller: null, errorCode: "CONFIGURATION_INVALID" } as const;
+    }
   }, [configuration]);
+  const controller = controllerSetup.controller;
 
   useEffect(() => {
     if (!controller) {
       setSnapshot({
         ...INITIAL_SNAPSHOT,
         state: "unavailable",
-        errorCode: "CONFIGURATION_REQUIRED",
+        errorCode: controllerSetup.errorCode,
       });
       return;
     }
@@ -136,7 +144,7 @@ function MobileAgentApp({
       subscription.remove();
       void controller.dispose();
     };
-  }, [controller]);
+  }, [controller, controllerSetup.errorCode]);
 
   const activate = async () => {
     if (!controller || busy || snapshot.state !== "unregistered") {
@@ -717,6 +725,7 @@ function friendlyError(code: string): string {
     AGENT_RUNTIME_UNAVAILABLE: "桌面代理运行时不可用",
     AGENT_START_FAILED: "代理启动失败，请稍后重试",
     CLIPBOARD_WRITE_FAILED: "无法写入系统剪贴板",
+    CONFIGURATION_INVALID: "客户端服务地址配置无效",
     CONFIGURATION_REQUIRED: "客户端服务地址尚未配置",
     CONTROL_CHANNEL_CLOSED: "Relay 连接已断开",
     DESKTOP_ACTIVATION_FAILED: "激活失败，请检查激活码",

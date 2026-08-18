@@ -47,6 +47,7 @@ export interface ControlSocket {
 
 export interface MobileAgentRuntimeOptions {
   readonly controlUrl: string;
+  readonly allowInsecureDevelopmentEndpoints?: boolean;
   readonly proxyId: string;
   readonly platform: "android" | "ios";
   readonly ticketProvider: SessionTicketProvider;
@@ -200,6 +201,8 @@ export class MobileAgentRuntime {
           }
           await this.options.tunnel.configure({
             dataWebSocketBaseUrl: dataBaseUrl(this.options.controlUrl),
+            allowInsecureDevelopmentEndpoints:
+              this.options.allowInsecureDevelopmentEndpoints ?? false,
             maxStreams: Math.min(message.max_streams, 128),
           });
           if (!this.isCurrent(generation) || this.socket !== socket) {
@@ -534,7 +537,17 @@ function stableError(error: unknown): string {
 
 function validateOptions(options: MobileAgentRuntimeOptions): void {
   const url = new URL(options.controlUrl);
-  if (url.protocol !== "wss:" || url.pathname !== "/agent/v1/control" || url.search || url.hash) {
+  if (
+    !(
+      url.protocol === "wss:" ||
+      (options.allowInsecureDevelopmentEndpoints === true && url.protocol === "ws:")
+    ) ||
+    url.pathname !== "/agent/v1/control" ||
+    url.search ||
+    url.hash ||
+    url.username ||
+    url.password
+  ) {
     throw new Error("CONTROL_URL_INVALID");
   }
   if (!options.proxyId || options.proxyId.length > 128) {

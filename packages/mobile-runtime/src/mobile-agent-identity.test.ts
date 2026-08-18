@@ -51,6 +51,30 @@ describe("MobileAgentIdentityManager", () => {
     expect(result).not.toHaveProperty("devicePrivateKey");
   });
 
+  it("allows HTTP and WS only behind the explicit development transport policy", async () => {
+    const insecureOptions = {
+      activationApiUrl: "http://api.example/agent-api/v1/activations:exchange",
+      controlUrl: "ws://relay.example/agent/v1/control",
+      platform: "android" as const,
+      store: new MemorySecretStore(),
+      crypto: fakeCrypto(),
+    };
+    expect(() => new MobileAgentIdentityManager(insecureOptions)).toThrow("AGENT_API_URL_INVALID");
+
+    const fetchImpl = vi.fn(async () => Response.json(activationResponse(), { status: 201 }));
+    const manager = new MobileAgentIdentityManager({
+      ...insecureOptions,
+      allowInsecureDevelopmentEndpoints: true,
+      fetchImpl,
+    });
+
+    await expect(manager.activate("one-time-code")).resolves.toMatchObject({ proxyId: PROXY_ID });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "http://api.example/agent-api/v1/activations:exchange",
+      expect.any(Object),
+    );
+  });
+
   it("signs the exact server canonical ticket request with a fresh nonce", async () => {
     const store = new MemorySecretStore();
     const sign = vi.fn(async (_privateKey: Uint8Array, message: Uint8Array) => {

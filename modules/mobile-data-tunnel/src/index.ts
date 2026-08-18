@@ -22,7 +22,11 @@ function requireModule() {
 
 export const mobileDataTunnel: MobileDataTunnel = {
   configure(configuration: MobileTunnelConfiguration): Promise<MobileTunnelSnapshot> {
-    return requireModule().configure(configuration.dataWebSocketBaseUrl, configuration.maxStreams);
+    return requireModule().configure(
+      configuration.dataWebSocketBaseUrl,
+      configuration.maxStreams,
+      configuration.allowInsecureDevelopmentEndpoints,
+    );
   },
   start(): Promise<MobileTunnelSnapshot> {
     return requireModule().start();

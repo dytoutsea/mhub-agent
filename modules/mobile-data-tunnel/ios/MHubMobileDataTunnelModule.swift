@@ -32,8 +32,17 @@ public final class MHubMobileDataTunnelModule: Module {
       }
     }
 
-    AsyncFunction("configure") { (dataWebSocketBaseUrl: String, maxStreams: Int) -> [String: Any?] in
-      let url = try self.validateConfiguration(dataWebSocketBaseUrl, maxStreams: maxStreams)
+    AsyncFunction("configure") {
+      (
+        dataWebSocketBaseUrl: String,
+        maxStreams: Int,
+        allowInsecureDevelopmentEndpoints: Bool
+      ) -> [String: Any?] in
+      let url = try self.validateConfiguration(
+        dataWebSocketBaseUrl,
+        maxStreams: maxStreams,
+        allowInsecureDevelopmentEndpoints: allowInsecureDevelopmentEndpoints
+      )
       return try self.updateAndPublish {
         guard !self.running && self.streams.isEmpty else {
           throw MobileTunnelError("MOBILE_DATA_TUNNEL_ALREADY_CONFIGURED")
@@ -289,18 +298,15 @@ public final class MHubMobileDataTunnelModule: Module {
     }
   }
 
-  private func validateConfiguration(_ value: String, maxStreams: Int) throws -> URL {
-    guard
-      let components = URLComponents(string: value),
-      components.scheme == "wss",
-      components.host?.isEmpty == false,
-      components.user == nil,
-      components.password == nil,
-      components.query == nil,
-      components.fragment == nil,
-      components.path == "/agent/v1/data",
-      let url = components.url
-    else {
+  private func validateConfiguration(
+    _ value: String,
+    maxStreams: Int,
+    allowInsecureDevelopmentEndpoints: Bool
+  ) throws -> URL {
+    guard let url = dataWebSocketBaseURL(
+      value,
+      allowInsecureDevelopmentEndpoints: allowInsecureDevelopmentEndpoints
+    ) else {
       throw MobileTunnelError("MOBILE_DATA_TUNNEL_URL_INVALID")
     }
     guard (1...128).contains(maxStreams) else {

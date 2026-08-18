@@ -17,6 +17,8 @@ const FORBIDDEN_ANDROID_PERMISSIONS = new Set([
 ]);
 
 function withMHubMobileDataTunnel(config) {
+  const allowInsecureDevelopmentEndpoints =
+    process.env.EXPO_PUBLIC_MHUB_RELEASE_CHANNEL?.trim() === "dev";
   config = withAndroidManifest(config, (configWithManifest) => {
     const manifest = configWithManifest.modResults.manifest;
     const permissions = manifest["uses-permission"] ?? [];
@@ -30,6 +32,13 @@ function withMHubMobileDataTunnel(config) {
       configWithManifest.modResults,
       "android.permission.INTERNET",
     );
+    const application = manifest.application?.[0];
+    if (!application?.$) {
+      throw new Error("MHub mobile plugin could not locate the Android application manifest");
+    }
+    application.$["android:usesCleartextTraffic"] = allowInsecureDevelopmentEndpoints
+      ? "true"
+      : "false";
     return configWithManifest;
   });
 
@@ -38,6 +47,12 @@ function withMHubMobileDataTunnel(config) {
     if (Array.isArray(backgroundModes) && backgroundModes.length > 0) {
       throw new Error("MHub mobile MVP forbids iOS UIBackgroundModes");
     }
+    const transportSecurity = configWithPlist.modResults.NSAppTransportSecurity;
+    configWithPlist.modResults.NSAppTransportSecurity = {
+      ...(transportSecurity && typeof transportSecurity === "object" ? transportSecurity : {}),
+      NSAllowsArbitraryLoads: allowInsecureDevelopmentEndpoints,
+      NSAllowsLocalNetworking: true,
+    };
     return configWithPlist;
   });
 

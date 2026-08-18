@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import expoPlist from "@expo/plist";
 
 const root = resolve(import.meta.dirname, "..");
 const manifestPath = resolve(root, "apps/mobile/android/app/src/main/AndroidManifest.xml");
@@ -38,6 +39,9 @@ const secureStoreExtractionRules = readFileSync(
   "utf8",
 );
 const infoPlist = readFileSync(infoPlistPath, "utf8");
+const parsedInfoPlist = expoPlist.default.parse(infoPlist);
+const allowInsecureDevelopmentEndpoints =
+  process.env.EXPO_PUBLIC_MHUB_RELEASE_CHANNEL?.trim() === "dev";
 const entitlements = entitlementFiles
   .map((name) => readFileSync(resolve(iosProjectRoot, name), "utf8"))
   .join("\n");
@@ -69,6 +73,10 @@ for (const permission of forbiddenAndroid) {
 if (!requestedAndroidPermissions.has("android.permission.INTERNET")) {
   failures.push("missing Android INTERNET permission");
 }
+const expectedCleartextValue = allowInsecureDevelopmentEndpoints ? "true" : "false";
+if (!manifest.includes(`android:usesCleartextTraffic="${expectedCleartextValue}"`)) {
+  failures.push("Android cleartext policy does not match the release channel");
+}
 if (/<service\b/.test(manifest)) {
   failures.push("Android services are outside the foreground-only MVP boundary");
 }
@@ -82,6 +90,12 @@ if (
 }
 if (infoPlist.includes("UIBackgroundModes")) {
   failures.push("forbidden iOS UIBackgroundModes");
+}
+if (
+  parsedInfoPlist.NSAppTransportSecurity?.NSAllowsArbitraryLoads !==
+  allowInsecureDevelopmentEndpoints
+) {
+  failures.push("iOS transport security policy does not match the release channel");
 }
 if (entitlements.includes("com.apple.developer.networking.networkextension")) {
   failures.push("forbidden iOS Network Extension entitlement");

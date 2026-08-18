@@ -18,6 +18,17 @@ class AndroidDataStreamTest {
   }
 
   @Test
+  fun allowsWsOnlyForTheExplicitDevelopmentPolicy() {
+    val url = "ws://relay.example/agent/v1/data"
+
+    assertFalse(isValidDataWebSocketBaseUrl(url, false))
+    assertTrue(isValidDataWebSocketBaseUrl(url, true))
+    assertTrue(isValidDataWebSocketBaseUrl("wss://relay.example/agent/v1/data", false))
+    assertFalse(isValidDataWebSocketBaseUrl("ws://user:pass@relay.example/agent/v1/data", true))
+    assertEquals("http", normalizeDataWebSocketBaseUrl(url).scheme)
+  }
+
+  @Test
   fun parsesPublicIpLiteralsWithoutResolvingDomains() {
     val publicV4 = parseIpLiteral("8.8.8.8")
     val publicV6 = parseIpLiteral("2606:4700:4700::1111")

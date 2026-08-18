@@ -49,6 +49,7 @@ describe("MobileAgentRuntime", () => {
 
     expect(harness.tunnel.configure).toHaveBeenCalledWith({
       dataWebSocketBaseUrl: "wss://relay.example/agent/v1/data",
+      allowInsecureDevelopmentEndpoints: false,
       maxStreams: 64,
     });
     expect(harness.tunnel.start).toHaveBeenCalledTimes(1);
@@ -288,6 +289,24 @@ describe("MobileAgentRuntime", () => {
   it("validates reconnect configuration", () => {
     expect(() => createHarness({ reconnectDelaysMs: [] })).toThrow("RECONNECT_DELAYS_INVALID");
     expect(() => createHarness({ reconnectDelaysMs: [1.5] })).toThrow("RECONNECT_DELAYS_INVALID");
+  });
+
+  it("allows WS only behind the explicit development transport policy", async () => {
+    expect(() => createHarness({ controlUrl: "ws://relay.example/agent/v1/control" })).toThrow(
+      "CONTROL_URL_INVALID",
+    );
+    const harness = createHarness({
+      controlUrl: "ws://relay.example/agent/v1/control",
+      allowInsecureDevelopmentEndpoints: true,
+    });
+
+    await startOnline(harness);
+
+    expect(harness.tunnel.configure).toHaveBeenCalledWith({
+      dataWebSocketBaseUrl: "ws://relay.example/agent/v1/data",
+      allowInsecureDevelopmentEndpoints: true,
+      maxStreams: 64,
+    });
   });
 });
 

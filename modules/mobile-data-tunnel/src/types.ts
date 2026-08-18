@@ -9,6 +9,7 @@ export interface MobileTunnelSnapshot {
 
 export interface MobileTunnelConfiguration {
   readonly dataWebSocketBaseUrl: string;
+  readonly allowInsecureDevelopmentEndpoints: boolean;
   readonly maxStreams: number;
 }
 

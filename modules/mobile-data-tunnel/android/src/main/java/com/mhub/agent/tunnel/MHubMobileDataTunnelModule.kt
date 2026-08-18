@@ -8,7 +8,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
-import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
@@ -35,8 +34,16 @@ class MHubMobileDataTunnelModule : Module() {
       foreground = appContext.currentActivity?.hasWindowFocus() == true
     }
 
-    AsyncFunction("configure") { dataWebSocketBaseUrl: String, maxStreams: Int ->
-      requireValidConfiguration(dataWebSocketBaseUrl, maxStreams)
+    AsyncFunction("configure") {
+        dataWebSocketBaseUrl: String,
+        maxStreams: Int,
+        allowInsecureDevelopmentEndpoints: Boolean,
+      ->
+      requireValidConfiguration(
+        dataWebSocketBaseUrl,
+        maxStreams,
+        allowInsecureDevelopmentEndpoints,
+      )
       synchronized(lock) {
         if (running || streams.isNotEmpty()) {
           throw MobileTunnelException("MOBILE_DATA_TUNNEL_ALREADY_CONFIGURED")
@@ -210,17 +217,12 @@ class MHubMobileDataTunnelModule : Module() {
     }.also(::publish)
   }
 
-  private fun requireValidConfiguration(value: String, maxStreams: Int) {
-    val uri = runCatching { URI(value) }.getOrNull()
-    if (
-      uri == null ||
-      uri.scheme != "wss" ||
-      uri.host.isNullOrBlank() ||
-      uri.userInfo != null ||
-      uri.query != null ||
-      uri.fragment != null ||
-      uri.path != "/agent/v1/data"
-    ) {
+  private fun requireValidConfiguration(
+    value: String,
+    maxStreams: Int,
+    allowInsecureDevelopmentEndpoints: Boolean,
+  ) {
+    if (!isValidDataWebSocketBaseUrl(value, allowInsecureDevelopmentEndpoints)) {
       throw MobileTunnelException("MOBILE_DATA_TUNNEL_URL_INVALID")
     }
     if (maxStreams !in 1..128) {

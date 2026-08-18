@@ -12,7 +12,11 @@ import type {
 } from "./types";
 
 interface NativeMobileDataTunnel extends NativeModule {
-  configure(dataWebSocketBaseUrl: string, maxStreams: number): Promise<MobileTunnelSnapshot>;
+  configure(
+    dataWebSocketBaseUrl: string,
+    maxStreams: number,
+    allowInsecureDevelopmentEndpoints: boolean,
+  ): Promise<MobileTunnelSnapshot>;
   start(): Promise<MobileTunnelSnapshot>;
   stop(reason: MobileTunnelStopReason): Promise<MobileTunnelSnapshot>;
   getSnapshot(): Promise<MobileTunnelSnapshot>;

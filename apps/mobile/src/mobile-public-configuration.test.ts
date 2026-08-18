@@ -12,6 +12,7 @@ describe("mobile public configuration", () => {
     ).toEqual({
       activationApiUrl: "https://api.example/agent-api/v1/activations:exchange",
       controlUrl: "wss://relay.example/agent/v1/control",
+      allowInsecureDevelopmentEndpoints: false,
     });
   });
 
@@ -25,6 +26,7 @@ describe("mobile public configuration", () => {
     ).toEqual({
       activationApiUrl: "http://8.138.121.25:8080/agent-api/v1/activations:exchange",
       controlUrl: "ws://8.138.121.25:8443/agent/v1/control",
+      allowInsecureDevelopmentEndpoints: true,
     });
     expect(
       parseMobilePublicConfiguration(

@@ -31,6 +31,7 @@ export interface MobileAgentRegistration {
 export interface MobileAgentIdentityOptions {
   readonly activationApiUrl: string;
   readonly controlUrl: string;
+  readonly allowInsecureDevelopmentEndpoints?: boolean;
   readonly platform: "android" | "ios";
   readonly store: MobileSecretStore;
   readonly crypto: MobileDeviceCrypto;
@@ -61,12 +62,17 @@ export class MobileAgentIdentityManager {
     this.activationEndpoint = endpoint(
       options.activationApiUrl,
       "/agent-api/v1/activations:exchange",
+      options.allowInsecureDevelopmentEndpoints ?? false,
     );
     this.sessionTicketEndpoint = endpoint(
       options.activationApiUrl.replace(/\/activations:exchange$/, "/session-tickets"),
       "/agent-api/v1/session-tickets",
+      options.allowInsecureDevelopmentEndpoints ?? false,
     );
-    this.controlUrl = controlEndpoint(options.controlUrl).toString();
+    this.controlUrl = controlEndpoint(
+      options.controlUrl,
+      options.allowInsecureDevelopmentEndpoints ?? false,
+    ).toString();
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.now = options.now ?? Date.now;
   }
@@ -288,8 +294,16 @@ function parseStoredIdentity(value: unknown, options: MobileAgentIdentityOptions
     !CREDENTIAL_ID.test(identity.credentialId) ||
     identity.platform !== options.platform ||
     identity.activationApiUrl !==
-      endpoint(options.activationApiUrl, "/agent-api/v1/activations:exchange").toString() ||
-    identity.controlUrl !== controlEndpoint(options.controlUrl).toString() ||
+      endpoint(
+        options.activationApiUrl,
+        "/agent-api/v1/activations:exchange",
+        options.allowInsecureDevelopmentEndpoints ?? false,
+      ).toString() ||
+    identity.controlUrl !==
+      controlEndpoint(
+        options.controlUrl,
+        options.allowInsecureDevelopmentEndpoints ?? false,
+      ).toString() ||
     decodeBase64Url(identity.devicePrivateKey).length !== 32
   ) {
     throw new Error("invalid");
@@ -307,17 +321,34 @@ function registration(identity: StoredIdentity): MobileAgentRegistration {
   };
 }
 
-function endpoint(value: string, pathname: string): URL {
+function endpoint(value: string, pathname: string, allowInsecureDevelopmentEndpoint: boolean): URL {
   const url = new URL(value);
-  if (url.protocol !== "https:" || url.pathname !== pathname || url.search || url.hash) {
+  if (
+    !(
+      url.protocol === "https:" ||
+      (allowInsecureDevelopmentEndpoint && url.protocol === "http:")
+    ) ||
+    url.pathname !== pathname ||
+    url.search ||
+    url.hash ||
+    url.username ||
+    url.password
+  ) {
     throw new Error("AGENT_API_URL_INVALID");
   }
   return url;
 }
 
-function controlEndpoint(value: string): URL {
+function controlEndpoint(value: string, allowInsecureDevelopmentEndpoint: boolean): URL {
   const url = new URL(value);
-  if (url.protocol !== "wss:" || url.pathname !== "/agent/v1/control" || url.search || url.hash) {
+  if (
+    !(url.protocol === "wss:" || (allowInsecureDevelopmentEndpoint && url.protocol === "ws:")) ||
+    url.pathname !== "/agent/v1/control" ||
+    url.search ||
+    url.hash ||
+    url.username ||
+    url.password
+  ) {
     throw new Error("CONTROL_URL_INVALID");
   }
   return url;

@@ -1,6 +1,7 @@
 export interface MobilePublicConfiguration {
   readonly activationApiUrl: string;
   readonly controlUrl: string;
+  readonly allowInsecureDevelopmentEndpoints: boolean;
 }
 
 export function mobilePublicConfiguration(): MobilePublicConfiguration | null {
@@ -51,7 +52,11 @@ export function parseMobilePublicConfiguration(
     ) {
       return null;
     }
-    return { activationApiUrl: activation.toString(), controlUrl: control.toString() };
+    return {
+      activationApiUrl: activation.toString(),
+      controlUrl: control.toString(),
+      allowInsecureDevelopmentEndpoints: allowInsecureDevelopmentEndpoint,
+    };
   } catch {
     return null;
   }

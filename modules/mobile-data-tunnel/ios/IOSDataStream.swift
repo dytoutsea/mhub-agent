@@ -10,6 +10,26 @@ struct IOSStreamOpenRequest {
   let connectTimeoutMs: Int
 }
 
+func dataWebSocketBaseURL(
+  _ value: String,
+  allowInsecureDevelopmentEndpoints: Bool
+) -> URL? {
+  guard
+    let components = URLComponents(string: value),
+    components.scheme == "wss" ||
+      (allowInsecureDevelopmentEndpoints && components.scheme == "ws"),
+    components.host?.isEmpty == false,
+    components.user == nil,
+    components.password == nil,
+    components.query == nil,
+    components.fragment == nil,
+    components.path == "/agent/v1/data"
+  else {
+    return nil
+  }
+  return components.url
+}
+
 final class IOSDataStream {
   private static let frameLimit = 1_024 * 1_024
   private static let readSize = 32 * 1_024

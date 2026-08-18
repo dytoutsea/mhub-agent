@@ -14,6 +14,27 @@ check(
     "wss://relay.example/agent/v1/data/rcn_1%2F2",
   "encodes the connection ID as one path segment"
 )
+check(
+  dataWebSocketBaseURL(
+    "ws://relay.example/agent/v1/data",
+    allowInsecureDevelopmentEndpoints: false
+  ) == nil,
+  "rejects cleartext WS without the development policy"
+)
+check(
+  dataWebSocketBaseURL(
+    "ws://relay.example/agent/v1/data",
+    allowInsecureDevelopmentEndpoints: true
+  )?.absoluteString == "ws://relay.example/agent/v1/data",
+  "allows cleartext WS with the development policy"
+)
+check(
+  dataWebSocketBaseURL(
+    "wss://relay.example/agent/v1/data",
+    allowInsecureDevelopmentEndpoints: false
+  ) != nil,
+  "allows secure WSS without the development policy"
+)
 
 let publicV4 = parseIPAddress("8.8.8.8")
 let publicV6 = parseIPAddress("2606:4700:4700::1111")

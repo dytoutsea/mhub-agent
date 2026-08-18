@@ -16,6 +16,7 @@ import java.net.Inet4Address
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.SocketTimeoutException
+import java.net.URI
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.LinkedBlockingQueue
@@ -34,6 +35,19 @@ internal data class StreamOpenRequest(
 
 internal fun normalizeDataWebSocketBaseUrl(value: String): HttpUrl {
   return Request.Builder().url(value).build().url
+}
+
+internal fun isValidDataWebSocketBaseUrl(
+  value: String,
+  allowInsecureDevelopmentEndpoints: Boolean,
+): Boolean {
+  val uri = runCatching { URI(value) }.getOrNull() ?: return false
+  return (uri.scheme == "wss" || (allowInsecureDevelopmentEndpoints && uri.scheme == "ws")) &&
+    !uri.host.isNullOrBlank() &&
+    uri.userInfo == null &&
+    uri.query == null &&
+    uri.fragment == null &&
+    uri.path == "/agent/v1/data"
 }
 
 internal class AndroidDataStream(

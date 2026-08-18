@@ -36,6 +36,7 @@ export function createMobileAgentController(
     createRuntime: (registration: MobileAgentRegistration, ticketProvider, runtimeSnapshot) =>
       new MobileAgentRuntime({
         controlUrl: configuration.controlUrl,
+        allowInsecureDevelopmentEndpoints: configuration.allowInsecureDevelopmentEndpoints,
         proxyId: registration.proxyId,
         platform,
         ticketProvider,

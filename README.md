@@ -98,7 +98,9 @@ npm run build:mobile
 npm run package:unsigned:mac:universal --workspace @mhub/desktop
 ```
 
-产物位于 `apps/desktop/release/`，只用于内部预览或开发环境验收。GitHub Actions 按平台仅上传 Windows `.exe` 或 macOS `.dmg`，不上传解包目录、macOS ZIP、blockmap 或更新元数据。`dev` 构建从 Repository Variables `MHUB_DEV_AGENT_ACTIVATION_API_URL` 和 `MHUB_DEV_RELAY_CONTROL_URL` 内置开发服地址，`main` 构建使用对应的 `MHUB_PROD_*` Variables 内置生产地址；配置缺失或正式地址不是 HTTPS/WSS 时构建直接失败。地址是公开构建信息，不得在这些 Variables 中放入凭据。当前构建明确关闭证书自动发现，不配置 `CSC_LINK`、`CSC_KEY_PASSWORD`、Apple Developer 证书或 notarization，因此不能宣称通过 Windows SmartScreen 或 macOS Gatekeeper。Universal 仅解决 CPU 架构兼容，不替代签名或公证。`MHUB_UPDATE_FEED_URL` 仅在已打包应用中启用，且必须为 HTTPS；更新检查、下载和安装均由 Electron Main/托盘发起，Renderer 不直接访问更新服务。
+产物位于 `apps/desktop/release/`，只用于内部预览或开发环境验收。桌面发布 Action 仅由 `vMAJOR.MINOR.PATCH` tag 触发，并校验 tag 所指 commit 的远端分支归属：已进入 `main` 的 commit 生成同版本正式 GitHub Release；尚未进入 `main`、但属于 `dev` 的 commit 将包版本加上 `-alpha` 并生成 GitHub prerelease；不属于这两个分支的 tag 会失败。如果 commit 同时属于两个分支，`main` 优先。tag 本身不记录创建时所在分支，因此应先推送目标分支，再推送 tag，例如 `git tag v1.2.3 && git push origin v1.2.3`。Action 按平台仅发布 Windows `.exe` 和 macOS `.dmg`，不发布解包目录、macOS ZIP、blockmap 或更新元数据。
+
+`dev` 构建从 Repository Variables `MHUB_DEV_AGENT_ACTIVATION_API_URL` 和 `MHUB_DEV_RELAY_CONTROL_URL` 内置开发服地址，`main` 构建使用对应的 `MHUB_PROD_*` Variables 内置生产地址；配置缺失或正式地址不是 HTTPS/WSS 时构建直接失败。地址是公开构建信息，不得在这些 Variables 中放入凭据。当前构建明确关闭证书自动发现，不配置 `CSC_LINK`、`CSC_KEY_PASSWORD`、Apple Developer 证书或 notarization，因此不能宣称通过 Windows SmartScreen 或 macOS Gatekeeper。Universal 仅解决 CPU 架构兼容，不替代签名或公证。`MHUB_UPDATE_FEED_URL` 仅在已打包应用中启用，且必须为 HTTPS；更新检查、下载和安装均由 Electron Main/托盘发起，Renderer 不直接访问更新服务。
 
 移动端的 `apps/mobile/eas.json` 已定义 development、preview（Android APK）和 production（Android AAB）配置。`Mobile CI` 在 `dev` 推送、手动触发或移动端相关 Pull Request 时运行：`dev` 推送和手动运行使用 GitHub Actions Secrets 中的 Android keystore、密码及 alias 生成 `mhub-agent-android-signed` 安装包；Pull Request 不接触签名 Secret，只上传 unsigned 编译验证包。iOS 仍上传 unsigned Simulator `.app` 压缩包，只能安装到模拟器，不能安装到真机。Artifact 保留 14 天。
 

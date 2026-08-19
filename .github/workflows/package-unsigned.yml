@@ -1,28 +1,73 @@
-name: Package Unsigned Desktop
+name: Release Unsigned Desktop
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - dev
-      - main
-
-env:
-  MHUB_RELEASE_CHANNEL: ${{ github.ref_name == 'main' && 'main' || 'dev' }}
-  MHUB_AGENT_ACTIVATION_API_URL: ${{ github.ref_name == 'main' && vars.MHUB_PROD_AGENT_ACTIVATION_API_URL || vars.MHUB_DEV_AGENT_ACTIVATION_API_URL }}
-  MHUB_RELAY_CONTROL_URL: ${{ github.ref_name == 'main' && vars.MHUB_PROD_RELAY_CONTROL_URL || vars.MHUB_DEV_RELAY_CONTROL_URL }}
-  EXPO_PUBLIC_MHUB_RELEASE_CHANNEL: ${{ github.ref_name == 'main' && 'main' || 'dev' }}
-  EXPO_PUBLIC_MHUB_AGENT_ACTIVATION_API_URL: ${{ github.ref_name == 'main' && vars.MHUB_PROD_AGENT_ACTIVATION_API_URL || vars.MHUB_DEV_AGENT_ACTIVATION_API_URL }}
-  EXPO_PUBLIC_MHUB_RELAY_CONTROL_URL: ${{ github.ref_name == 'main' && vars.MHUB_PROD_RELAY_CONTROL_URL || vars.MHUB_DEV_RELAY_CONTROL_URL }}
+    tags:
+      - "v*"
 
 permissions:
   contents: read
 
 jobs:
+  release_metadata:
+    name: Resolve release channel and version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      channel: ${{ steps.release.outputs.channel }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+      version: ${{ steps.release.outputs.version }}
+      release_name: ${{ steps.release.outputs.release_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate tag and resolve owning branch
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "Release tags must use vMAJOR.MINOR.PATCH, for example v1.2.3"
+            exit 1
+          fi
+
+          base_version="${GITHUB_REF_NAME#v}"
+          tagged_commit="$(git rev-parse "${GITHUB_SHA}^{commit}")"
+          git fetch --no-tags origin \
+            +refs/heads/main:refs/remotes/origin/main \
+            +refs/heads/dev:refs/remotes/origin/dev
+
+          if git merge-base --is-ancestor "$tagged_commit" origin/main; then
+            channel="main"
+            prerelease="false"
+            version="$base_version"
+          elif git merge-base --is-ancestor "$tagged_commit" origin/dev; then
+            channel="dev"
+            prerelease="true"
+            version="${base_version}-alpha"
+          else
+            echo "Tagged commit $tagged_commit is not contained in origin/main or origin/dev"
+            exit 1
+          fi
+
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release_name=v$version" >> "$GITHUB_OUTPUT"
+
   package:
     name: ${{ matrix.os }} unsigned artifact
+    needs: release_metadata
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    env:
+      RELEASE_CHANNEL: ${{ needs.release_metadata.outputs.channel }}
+      DEV_AGENT_ACTIVATION_API_URL: ${{ vars.MHUB_DEV_AGENT_ACTIVATION_API_URL }}
+      DEV_RELAY_CONTROL_URL: ${{ vars.MHUB_DEV_RELAY_CONTROL_URL }}
+      PROD_AGENT_ACTIVATION_API_URL: ${{ vars.MHUB_PROD_AGENT_ACTIVATION_API_URL }}
+      PROD_RELAY_CONTROL_URL: ${{ vars.MHUB_PROD_RELAY_CONTROL_URL }}
     strategy:
       fail-fast: false
       matrix:
@@ -33,12 +78,38 @@ jobs:
         shell: bash
         run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
+      - name: Select release endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$RELEASE_CHANNEL" == "main" ]]; then
+            activation_api_url="$PROD_AGENT_ACTIVATION_API_URL"
+            relay_control_url="$PROD_RELAY_CONTROL_URL"
+          else
+            activation_api_url="$DEV_AGENT_ACTIVATION_API_URL"
+            relay_control_url="$DEV_RELAY_CONTROL_URL"
+          fi
+
+          {
+            echo "MHUB_RELEASE_CHANNEL=$RELEASE_CHANNEL"
+            echo "MHUB_AGENT_ACTIVATION_API_URL=$activation_api_url"
+            echo "MHUB_RELAY_CONTROL_URL=$relay_control_url"
+            echo "EXPO_PUBLIC_MHUB_RELEASE_CHANNEL=$RELEASE_CHANNEL"
+            echo "EXPO_PUBLIC_MHUB_AGENT_ACTIVATION_API_URL=$activation_api_url"
+            echo "EXPO_PUBLIC_MHUB_RELAY_CONTROL_URL=$relay_control_url"
+          } >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run ensure:platform-deps
+      - name: Set desktop package version from tag
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.release_metadata.outputs.version }}
+        run: npm version "$RELEASE_VERSION" --no-git-tag-version --workspace @mhub/desktop
       - run: npm run client:config:check
       - name: Verify shared and desktop source
         shell: bash
@@ -80,3 +151,55 @@ jobs:
           path: apps/desktop/release/*.dmg
           if-no-files-found: error
           retention-days: 14
+
+  release:
+    name: Publish GitHub Release
+    needs:
+      - release_metadata
+      - package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download packaged installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: mhub-agent-*-unsigned
+          path: release-assets
+          merge-multiple: true
+      - name: Publish release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_NAME: ${{ needs.release_metadata.outputs.release_name }}
+          IS_PRERELEASE: ${{ needs.release_metadata.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+
+          shopt -s nullglob
+          assets=(release-assets/*.exe release-assets/*.dmg)
+          if (( ${#assets[@]} == 0 )); then
+            echo "No release assets were downloaded"
+            exit 1
+          fi
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
+            gh release edit "$GITHUB_REF_NAME" \
+              --title "$RELEASE_NAME" \
+              --prerelease="$IS_PRERELEASE"
+          else
+            release_args=(
+              "$GITHUB_REF_NAME"
+              "${assets[@]}"
+              --verify-tag
+              --title "$RELEASE_NAME"
+              --generate-notes
+            )
+            if [[ "$IS_PRERELEASE" == "true" ]]; then
+              release_args+=(--prerelease)
+            fi
+            gh release create "${release_args[@]}"
+          fi

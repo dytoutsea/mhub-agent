@@ -104,12 +104,12 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run ensure:platform-deps
       - name: Set desktop package version from tag
         shell: bash
         env:
           RELEASE_VERSION: ${{ needs.release_metadata.outputs.version }}
         run: npm version "$RELEASE_VERSION" --no-git-tag-version --workspace @mhub/desktop
+      - run: npm run ensure:platform-deps
       - run: npm run client:config:check
       - name: Export Expo Web renderer
         run: npm run build:mobile

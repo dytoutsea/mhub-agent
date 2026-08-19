@@ -102,7 +102,7 @@ npm run package:unsigned:mac:universal --workspace @mhub/desktop
 
 `dev` 构建从 Repository Variables `MHUB_DEV_AGENT_ACTIVATION_API_URL` 和 `MHUB_DEV_RELAY_CONTROL_URL` 内置开发服地址，`main` 构建使用对应的 `MHUB_PROD_*` Variables 内置生产地址；配置缺失或正式地址不是 HTTPS/WSS 时构建直接失败。地址是公开构建信息，不得在这些 Variables 中放入凭据。当前构建明确关闭证书自动发现，不配置 `CSC_LINK`、`CSC_KEY_PASSWORD`、Apple Developer 证书或 notarization，因此不能宣称通过 Windows SmartScreen 或 macOS Gatekeeper。Universal 仅解决 CPU 架构兼容，不替代签名或公证。`MHUB_UPDATE_FEED_URL` 仅在已打包应用中启用，且必须为 HTTPS；更新检查、下载和安装均由 Electron Main/托盘发起，Renderer 不直接访问更新服务。
 
-移动端的 `apps/mobile/eas.json` 已定义 development、preview（Android APK）和 production（Android AAB）配置。`Mobile CI` 仅由 `vMAJOR.MINOR.PATCH` tag 触发，并使用与桌面发布相同的远端分支归属规则选择 `dev` 或 `main` 公开端点。Android job 使用 GitHub Actions Secrets 中的 keystore、密码及 alias 生成 `mhub-agent-android-signed` 安装包；iOS 仍上传 unsigned Simulator `.app` 压缩包，只能安装到模拟器，不能安装到真机。两个 Artifact 均保留 14 天。Pull Request 和普通分支推送由独立的 `Verify` workflow 验证，不触发移动安装包构建。
+移动端的 `apps/mobile/eas.json` 已定义 development、preview（Android APK）和 production（Android AAB）配置。`Mobile CI` 仅由 `vMAJOR.MINOR.PATCH` tag 触发，并使用与桌面发布相同的远端分支归属规则选择 `dev` 或 `main` 公开端点。Android job 使用 GitHub Actions Secrets 中的 keystore、密码及 alias 生成 `mhub-agent-android-signed` 安装包，Artifact 保留 14 天。iOS Simulator 构建当前不在 Mobile CI 中执行。Pull Request 和普通分支推送由独立的 `Verify` workflow 验证，不触发移动安装包构建。
 
 Android CI 签名需要仓库 Secrets `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD`。keystore 只在 Runner 临时目录恢复，签名后立即删除；签名文件和密码不得写入仓库、日志或 Expo 公共配置。EAS credentials、iOS 真机签名和商店上传仍属于后续发布阶段。
 

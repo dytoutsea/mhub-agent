@@ -173,11 +173,15 @@ jobs:
             exit 1
           fi
 
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+          upload_existing_release() {
             gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
             gh release edit "$GITHUB_REF_NAME" \
               --title "$RELEASE_NAME" \
               --prerelease="$IS_PRERELEASE"
+          }
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            upload_existing_release
           else
             release_args=(
               "$GITHUB_REF_NAME"
@@ -189,5 +193,9 @@ jobs:
             if [[ "$IS_PRERELEASE" == "true" ]]; then
               release_args+=(--prerelease)
             fi
-            gh release create "${release_args[@]}"
+
+            if ! gh release create "${release_args[@]}"; then
+              gh release view "$GITHUB_REF_NAME" >/dev/null
+              upload_existing_release
+            fi
           fi

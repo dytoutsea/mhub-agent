@@ -17,6 +17,9 @@ jobs:
       channel: ${{ steps.release.outputs.channel }}
       activation_api_url: ${{ steps.release.outputs.activation_api_url }}
       relay_control_url: ${{ steps.release.outputs.relay_control_url }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+      version: ${{ steps.release.outputs.version }}
+      release_name: ${{ steps.release.outputs.release_name }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,6 +40,7 @@ jobs:
             exit 1
           fi
 
+          base_version="${GITHUB_REF_NAME#v}"
           tagged_commit="$(git rev-parse "${GITHUB_SHA}^{commit}")"
           git fetch --no-tags origin \
             +refs/heads/main:refs/remotes/origin/main \
@@ -44,10 +48,14 @@ jobs:
 
           if git merge-base --is-ancestor "$tagged_commit" origin/main; then
             channel="main"
+            prerelease="false"
+            version="$base_version"
             activation_api_url="$PROD_AGENT_ACTIVATION_API_URL"
             relay_control_url="$PROD_RELAY_CONTROL_URL"
           elif git merge-base --is-ancestor "$tagged_commit" origin/dev; then
             channel="dev"
+            prerelease="true"
+            version="${base_version}-alpha"
             activation_api_url="$DEV_AGENT_ACTIVATION_API_URL"
             relay_control_url="$DEV_RELAY_CONTROL_URL"
           else
@@ -58,6 +66,9 @@ jobs:
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "activation_api_url=$activation_api_url" >> "$GITHUB_OUTPUT"
           echo "relay_control_url=$relay_control_url" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release_name=v$version" >> "$GITHUB_OUTPUT"
 
   config:
     needs: release_metadata
@@ -169,3 +180,66 @@ jobs:
           path: apps/mobile/release/*.apk
           if-no-files-found: error
           retention-days: 14
+
+  release:
+    name: Publish Android APK to GitHub Release
+    needs:
+      - release_metadata
+      - android-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download signed Android APK
+        uses: actions/download-artifact@v4
+        with:
+          name: mhub-agent-android-signed
+          path: release-assets
+      - name: Publish Android release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_NAME: ${{ needs.release_metadata.outputs.release_name }}
+          RELEASE_VERSION: ${{ needs.release_metadata.outputs.version }}
+          IS_PRERELEASE: ${{ needs.release_metadata.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+
+          shopt -s nullglob
+          apk_sources=(release-assets/*.apk)
+          if (( ${#apk_sources[@]} != 1 )); then
+            echo "Expected exactly one signed Android APK, found ${#apk_sources[@]}"
+            exit 1
+          fi
+
+          asset="release-assets/mhub-agent-${RELEASE_VERSION}-android-signed.apk"
+          mv "${apk_sources[0]}" "$asset"
+
+          upload_existing_release() {
+            gh release upload "$GITHUB_REF_NAME" "$asset" --clobber
+            gh release edit "$GITHUB_REF_NAME" \
+              --title "$RELEASE_NAME" \
+              --prerelease="$IS_PRERELEASE"
+          }
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            upload_existing_release
+          else
+            release_args=(
+              "$GITHUB_REF_NAME"
+              "$asset"
+              --verify-tag
+              --title "$RELEASE_NAME"
+              --generate-notes
+            )
+            if [[ "$IS_PRERELEASE" == "true" ]]; then
+              release_args+=(--prerelease)
+            fi
+
+            if ! gh release create "${release_args[@]}"; then
+              gh release view "$GITHUB_REF_NAME" >/dev/null
+              upload_existing_release
+            fi
+          fi

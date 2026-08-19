@@ -1,36 +1,75 @@
 name: Mobile CI
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - dev
-      - main
-  pull_request:
-    paths:
-      - "apps/mobile/**"
-      - "modules/mobile-data-tunnel/**"
-      - "packages/mobile-runtime/**"
-      - "package.json"
-      - "package-lock.json"
-      - ".nvmrc"
-      - ".github/workflows/mobile-config.yml"
-
-env:
-  MHUB_RELEASE_CHANNEL: ${{ (github.ref_name == 'main' || github.base_ref == 'main') && 'main' || 'dev' }}
-  MHUB_AGENT_ACTIVATION_API_URL: ${{ (github.ref_name == 'main' || github.base_ref == 'main') && vars.MHUB_PROD_AGENT_ACTIVATION_API_URL || vars.MHUB_DEV_AGENT_ACTIVATION_API_URL }}
-  MHUB_RELAY_CONTROL_URL: ${{ (github.ref_name == 'main' || github.base_ref == 'main') && vars.MHUB_PROD_RELAY_CONTROL_URL || vars.MHUB_DEV_RELAY_CONTROL_URL }}
-  EXPO_PUBLIC_MHUB_RELEASE_CHANNEL: ${{ (github.ref_name == 'main' || github.base_ref == 'main') && 'main' || 'dev' }}
-  EXPO_PUBLIC_MHUB_AGENT_ACTIVATION_API_URL: ${{ (github.ref_name == 'main' || github.base_ref == 'main') && vars.MHUB_PROD_AGENT_ACTIVATION_API_URL || vars.MHUB_DEV_AGENT_ACTIVATION_API_URL }}
-  EXPO_PUBLIC_MHUB_RELAY_CONTROL_URL: ${{ (github.ref_name == 'main' || github.base_ref == 'main') && vars.MHUB_PROD_RELAY_CONTROL_URL || vars.MHUB_DEV_RELAY_CONTROL_URL }}
+    tags:
+      - "v*"
 
 permissions:
   contents: read
 
 jobs:
+  release_metadata:
+    name: Resolve release channel
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      channel: ${{ steps.release.outputs.channel }}
+      activation_api_url: ${{ steps.release.outputs.activation_api_url }}
+      relay_control_url: ${{ steps.release.outputs.relay_control_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate tag and resolve owning branch
+        id: release
+        shell: bash
+        env:
+          DEV_AGENT_ACTIVATION_API_URL: ${{ vars.MHUB_DEV_AGENT_ACTIVATION_API_URL }}
+          DEV_RELAY_CONTROL_URL: ${{ vars.MHUB_DEV_RELAY_CONTROL_URL }}
+          PROD_AGENT_ACTIVATION_API_URL: ${{ vars.MHUB_PROD_AGENT_ACTIVATION_API_URL }}
+          PROD_RELAY_CONTROL_URL: ${{ vars.MHUB_PROD_RELAY_CONTROL_URL }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "Release tags must use vMAJOR.MINOR.PATCH, for example v1.2.3"
+            exit 1
+          fi
+
+          tagged_commit="$(git rev-parse "${GITHUB_SHA}^{commit}")"
+          git fetch --no-tags origin \
+            +refs/heads/main:refs/remotes/origin/main \
+            +refs/heads/dev:refs/remotes/origin/dev
+
+          if git merge-base --is-ancestor "$tagged_commit" origin/main; then
+            channel="main"
+            activation_api_url="$PROD_AGENT_ACTIVATION_API_URL"
+            relay_control_url="$PROD_RELAY_CONTROL_URL"
+          elif git merge-base --is-ancestor "$tagged_commit" origin/dev; then
+            channel="dev"
+            activation_api_url="$DEV_AGENT_ACTIVATION_API_URL"
+            relay_control_url="$DEV_RELAY_CONTROL_URL"
+          else
+            echo "Tagged commit $tagged_commit is not contained in origin/main or origin/dev"
+            exit 1
+          fi
+
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "activation_api_url=$activation_api_url" >> "$GITHUB_OUTPUT"
+          echo "relay_control_url=$relay_control_url" >> "$GITHUB_OUTPUT"
+
   config:
+    needs: release_metadata
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      MHUB_RELEASE_CHANNEL: ${{ needs.release_metadata.outputs.channel }}
+      MHUB_AGENT_ACTIVATION_API_URL: ${{ needs.release_metadata.outputs.activation_api_url }}
+      MHUB_RELAY_CONTROL_URL: ${{ needs.release_metadata.outputs.relay_control_url }}
+      EXPO_PUBLIC_MHUB_RELEASE_CHANNEL: ${{ needs.release_metadata.outputs.channel }}
+      EXPO_PUBLIC_MHUB_AGENT_ACTIVATION_API_URL: ${{ needs.release_metadata.outputs.activation_api_url }}
+      EXPO_PUBLIC_MHUB_RELAY_CONTROL_URL: ${{ needs.release_metadata.outputs.relay_control_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -50,8 +89,16 @@ jobs:
 
   android-apk:
     name: Android APK
+    needs: release_metadata
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      MHUB_RELEASE_CHANNEL: ${{ needs.release_metadata.outputs.channel }}
+      MHUB_AGENT_ACTIVATION_API_URL: ${{ needs.release_metadata.outputs.activation_api_url }}
+      MHUB_RELAY_CONTROL_URL: ${{ needs.release_metadata.outputs.relay_control_url }}
+      EXPO_PUBLIC_MHUB_RELEASE_CHANNEL: ${{ needs.release_metadata.outputs.channel }}
+      EXPO_PUBLIC_MHUB_AGENT_ACTIVATION_API_URL: ${{ needs.release_metadata.outputs.activation_api_url }}
+      EXPO_PUBLIC_MHUB_RELAY_CONTROL_URL: ${{ needs.release_metadata.outputs.relay_control_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -86,7 +133,6 @@ jobs:
           (cd apps/mobile/android && ./gradlew --no-daemon --stacktrace assembleRelease)
           test -f apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
       - name: Sign Android APK
-        if: github.event_name != 'pull_request'
         shell: bash
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -116,26 +162,26 @@ jobs:
             --out apps/mobile/release/mhub-agent-android-signed.apk \
             apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
           "$apksigner_path" verify apps/mobile/release/mhub-agent-android-signed.apk
-      - name: Stage unsigned Pull Request APK
-        if: github.event_name == 'pull_request'
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p apps/mobile/release
-          cp apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk \
-            apps/mobile/release/mhub-agent-android-unsigned.apk
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.event_name == 'pull_request' && 'mhub-agent-android-unsigned' || 'mhub-agent-android-signed' }}
+          name: mhub-agent-android-signed
           path: apps/mobile/release/*.apk
           if-no-files-found: error
           retention-days: 14
 
   ios-unsigned:
     name: iOS unsigned simulator app
+    needs: release_metadata
     runs-on: macos-latest
     timeout-minutes: 35
+    env:
+      MHUB_RELEASE_CHANNEL: ${{ needs.release_metadata.outputs.channel }}
+      MHUB_AGENT_ACTIVATION_API_URL: ${{ needs.release_metadata.outputs.activation_api_url }}
+      MHUB_RELAY_CONTROL_URL: ${{ needs.release_metadata.outputs.relay_control_url }}
+      EXPO_PUBLIC_MHUB_RELEASE_CHANNEL: ${{ needs.release_metadata.outputs.channel }}
+      EXPO_PUBLIC_MHUB_AGENT_ACTIVATION_API_URL: ${{ needs.release_metadata.outputs.activation_api_url }}
+      EXPO_PUBLIC_MHUB_RELAY_CONTROL_URL: ${{ needs.release_metadata.outputs.relay_control_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
